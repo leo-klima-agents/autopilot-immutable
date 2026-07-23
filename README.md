@@ -22,9 +22,13 @@ Two deliverables (build brief §0):
 ## What EpochPilot does
 
 Pools AERO into a single fixed-term veNFT and runs the honest strategy v2 permits —
-**mirror-ex-self** (track every other participant's allocation; earns the weight-average
-return by construction). v2's synchronized weekly epochs offer no reactivity edge, so the
-PoC demonstrates *machinery*, not alpha:
+**mirror-ex-self** (track every other participant's allocation). This earns the
+weight-average return *against the settled vote distribution* — but v2 votes are cast
+once per epoch, before the whitelist-only final hour when weights move most, so the
+realized return is the weight-average with an end-of-epoch tracking error, not the
+weight-average itself (see `docs/design-notes.md` #11; v3 removes this). v2's
+synchronized weekly epochs offer no reactivity edge either, so the PoC demonstrates
+*machinery*, not alpha:
 
 - `deposit` — 1:1 refundable during seeding; pro-rata and irrevocable after `activate()`.
 - `revote(pools, deadPools)` — anyone, weekly, from 6h before the flip until the Voter's

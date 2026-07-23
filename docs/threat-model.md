@@ -55,6 +55,11 @@ adversarial code, since no privileged role exists to attack.
 
 - **Vote staleness** if no caller shows up: allocations persist; returns degrade toward
   the (mirrored) market average — which is the strategy's floor anyway. Never unsafe.
+- **End-of-epoch mirror tracking error.** Even with a caller every epoch, the vault
+  votes once and before the whitelist-only final hour, so it mirrors a pre-settlement
+  snapshot the final hour reshapes — realized return is the weight-average with a
+  negatively-biased tracking error (`docs/design-notes.md` #11). A v2-structural limit
+  of any on-chain voting strategy, not a bug; v3's continuous allocation removes it.
 - **Weight decay** over the 26-week term (v2 locks decay): accepted for a demonstrator;
   refreshed at each weekly revote checkpoint.
 - **Secondary-market illiquidity of shares** pre-term-end: disclosed above the fold.

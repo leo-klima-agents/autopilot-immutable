@@ -133,3 +133,48 @@ privileged check would pass). The gate now also disassembles the compiled runtim
 (metadata-stripped) and fails on any DELEGATECALL / SELFDESTRUCT / CALLCODE opcode,
 and the no-privilege property is exercised behaviorally by the fork suite's
 fresh-EOA probe. Greps remain as a lint layer only.
+
+## Finding 11 — mirror-ex-self earns the weight-average only against *settled* votes
+
+The brief (§4.3) and an earlier draft of this repo claimed mirror-ex-self "earns the
+weight-average return by construction." That is only true if the vault mirrors the
+**settlement** vote distribution. The identity: if the vault sets `vₚ ∝ Tₚ` (final
+total votes on pool p), its revenue is `Σ (vₚ/Tₚ)·Rₚ = (V/ΣT)·ΣRₚ` = exactly the
+weight-average per unit weight. Mirror any *earlier* snapshot `Tₚᵗ` and the realized
+share is `vₚ/Tₚ^final`, giving `(V/ΣTᵗ)·Σ(Tₚᵗ/Tₚ^final)·Rₚ` — a tracking error whose
+factor `Tₚᵗ/Tₚ^final < 1` precisely for the pools that gain votes after time *t*.
+
+In v2 this bias is not hypothetical and it is not small. Voting is a claim on fixed
+per-epoch bribes, so voters (and off-chain vote markets) rush the highest
+reward-per-vote pools in the **final hour** to equalise `Rₚ/Tₚ`. The vault votes
+**once** per epoch (`onlyNewEpoch`, G9a) and cannot vote in the whitelist-only final
+hour (G9c), so it is structurally forced to mirror a pre-final-hour snapshot that the
+final hour then reshapes — away from exactly the pools the late money concentrates in.
+Realized return is therefore the weight-average **with a negatively-biased tracking
+error**, not the weight-average itself. No on-chain v2 strategy escapes this: the
+decisive repricing happens in a window the vault cannot act in, and it gets one shot
+before then.
+
+Two consequences, both recorded rather than fixed (the PoC's job is to demonstrate
+machinery honestly, §9, not to win v2's vote market):
+
+- **Voting "by revenue" instead of by votes does not help in v2.** The
+  return-maximising quantity is reward-per-vote `(feesₚ+bribesₚ)/votesₚ`, but the
+  denominator *is* the volatile end-of-epoch vote count — optimising on it makes the
+  vault more sensitive to the final-hour reshaping, not less, and a mechanical
+  reward-per-vote rule is a bribe magnet that the coverage check does not defend. It is
+  also §4.4's explicitly out-of-scope predictive alpha.
+- **This is a v2-structural limitation that v3 removes.** v3 has no synchronised flip,
+  so the final-hour snipe dynamic — an artifact of the shared settlement instant —
+  largely disappears; and v3's *primary* signal is already revenue-based, but via the
+  protocol's **gauge caps** (`capₚ ≈ κ × projected revenue`, §4.2), a maintained
+  revenue projection read on-chain, not a live contested vote denominator. The v3 edge
+  is tracking the fresh cap vector faster than the laggards (the staggered-tranche
+  reactivity edge), which sidesteps both the crowding problem and the settlement-timing
+  problem above.
+
+**Action for spec freeze:** state mirror's guarantee in §4.3 as "weight-average
+against settled weights" and note that on a synchronised-epoch protocol the fallback's
+realized return carries this tracking error; confirm v3's continuous allocation makes
+mirror's snapshot effectively the settlement snapshot (no shared flip to be stale
+against).
