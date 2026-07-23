@@ -10,9 +10,6 @@ interface IVoter {
     /// @notice The VotingEscrow this Voter governs.
     function ve() external view returns (address);
 
-    /// @notice The Minter driving weekly emissions (used to detect a halted protocol).
-    function minter() external view returns (address);
-
     /// @notice Casts `tokenId`'s full voting weight across `poolVote` in
     ///         proportion to `weights` (relative; the Voter normalizes).
     /// @dev Gated on-chain: once per epoch per tokenId (`onlyNewEpoch`), not in

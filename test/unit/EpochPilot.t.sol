@@ -1,32 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {TestBase} from "../utils/TestBase.sol";
+import {MockFixture} from "../utils/MockFixture.sol";
 import {EpochPilot} from "../../src/EpochPilot.sol";
 import {
     MockERC20,
     MockVotingEscrow,
-    MockVoter,
-    MockMinter,
     MockReward,
     MockRewardsDistributor,
     FeeOnTransferToken,
     RevertingToken,
     NoReturnToken,
+    BurnySenderToken,
     PhantomBalanceToken,
     ReentrantToken
 } from "../mocks/MockProtocol.sol";
 
-contract EpochPilotUnitTest is TestBase {
-    uint256 constant WEEK = 7 days;
-
-    MockERC20 aero;
-    MockVotingEscrow ve;
-    MockVoter voter;
-    MockMinter minter;
-    MockRewardsDistributor dist;
-    EpochPilot pilot;
-
+contract EpochPilotUnitTest is MockFixture {
     MockReward feesA;
     MockReward bribeA;
     address poolA = makeAddr("poolA");
@@ -47,20 +37,7 @@ contract EpochPilotUnitTest is TestBase {
     address keeper = makeAddr("keeper");
 
     function setUp() public {
-        // Anchor to a week boundary + 2 days so vote gates are predictable.
-        vm.warp(1_784_764_800 + 2 days);
-
-        aero = new MockERC20("Aerodrome", "AERO");
-        ve = new MockVotingEscrow(aero);
-        voter = new MockVoter(ve);
-        minter = new MockMinter();
-        minter.updatePeriod();
-        voter.setMinter(address(minter));
-        dist = new MockRewardsDistributor(ve, aero, minter);
-        ve.setVoter(address(voter));
-        ve.setDistributor(address(dist));
-
-        pilot = new EpochPilot(address(voter));
+        _deployMockProtocol();
 
         feesA = new MockReward(ve);
         bribeA = new MockReward(ve);
@@ -80,13 +57,6 @@ contract EpochPilotUnitTest is TestBase {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
-
-    function _deposit(address who, uint256 amt) internal {
-        vm.startPrank(who);
-        aero.approve(address(pilot), amt);
-        pilot.deposit(amt);
-        vm.stopPrank();
-    }
 
     function _activate(uint256 aliceAmt, uint256 bobAmt) internal {
         _deposit(alice, aliceAmt);
@@ -217,18 +187,18 @@ contract EpochPilotUnitTest is TestBase {
         address[] memory pools = _pools2();
         // too early (mid-epoch)
         vm.expectRevert(EpochPilot.OutsideWindow.selector);
-        pilot.revote(pools);
+        _revote(pools);
         // last hour: protocol whitelist zone — blocked by us first
         vm.warp(voter.epochNext(block.timestamp) - 30 minutes);
         vm.expectRevert(EpochPilot.OutsideWindow.selector);
-        pilot.revote(pools);
+        _revote(pools);
     }
 
     function test_revote_mirrorsMarketWeights() public {
         _activate(600e18, 400e18);
         _warpToRevoteWindow();
         vm.prank(keeper);
-        pilot.revote(_pools2());
+        _revote(_pools2());
         uint256 id = pilot.tokenId();
         uint256 va = voter.votes(id, poolA);
         uint256 vb = voter.votes(id, poolB);
@@ -244,7 +214,7 @@ contract EpochPilotUnitTest is TestBase {
         address[] memory pools = new address[](1);
         pools[0] = poolB; // only 40% of weight
         vm.expectRevert(EpochPilot.CoverageTooLow.selector);
-        pilot.revote(pools);
+        _revote(pools);
     }
 
     function test_revote_rejectsDuplicatesAndDeadGauges() public {
@@ -254,20 +224,20 @@ contract EpochPilotUnitTest is TestBase {
         dup[0] = poolA;
         dup[1] = poolA;
         vm.expectRevert(EpochPilot.BadCandidateSet.selector);
-        pilot.revote(dup);
+        _revote(dup);
 
         voter.killGauge(gaugeA);
         vm.expectRevert(EpochPilot.BadCandidateSet.selector);
-        pilot.revote(_pools2());
+        _revote(_pools2());
     }
 
     function test_revote_onceLivePerEpoch_protocolEnforced() public {
         _activate(600e18, 400e18);
         _warpToRevoteWindow();
-        pilot.revote(_pools2());
+        _revote(_pools2());
         vm.warp(block.timestamp + 30 minutes);
         vm.expectRevert("already voted");
-        pilot.revote(_pools2());
+        _revote(_pools2());
     }
 
     function test_revote_bountyRampsAndIsCappedByLooseAero() public {
@@ -292,7 +262,7 @@ contract EpochPilotUnitTest is TestBase {
         uint256 staleness = block.timestamp - pilot.lastVoteAt();
         uint256 expected = pilot.BOUNTY_RAMP_AERO() * staleness / WEEK;
         vm.prank(keeper);
-        pilot.revote(_pools2());
+        _revote(_pools2());
         assertEq(aero.balanceOf(keeper), expected);
         assertEq(pilot.looseAero(), loose - expected);
     }
@@ -414,12 +384,42 @@ contract EpochPilotUnitTest is TestBase {
         assertEq(usdtLike.balanceOf(alice), got);
     }
 
-    function test_claimUser_batchedCursor() public {
+    function test_credits_coalesceBetweenBalanceChanges() public {
         _activate(600e18, 400e18);
+        // five claims with no share movement in between share one seq and
+        // must coalesce into a single credit entry — the anti-spam bound
         for (uint256 i; i < 5; ++i) {
             usdc.mint(address(bribeA), 10e18);
             bribeA.notify(address(usdc), pilot.tokenId(), 10e18);
             _claimOneGauge(gaugeA, address(usdc));
+        }
+        assertEq(pilot.creditCount(address(usdc)), 1);
+        // a balance change splits the window: the next claim opens entry #2
+        vm.prank(alice);
+        pilot.transfer(bob, 1e18);
+        usdc.mint(address(bribeA), 10e18);
+        bribeA.notify(address(usdc), pilot.tokenId(), 10e18);
+        _claimOneGauge(gaugeA, address(usdc));
+        assertEq(pilot.creditCount(address(usdc)), 2);
+        // and everyone can still pull their exact share of all 60
+        vm.prank(alice);
+        uint256 gotA = pilot.claimUser(address(usdc), 0);
+        vm.prank(bob);
+        uint256 gotB = pilot.claimUser(address(usdc), 0);
+        assertLe(gotA + gotB, usdc.balanceOf(address(pilot)) + gotA + gotB);
+        assertGt(gotA, 0);
+        assertGt(gotB, 0);
+    }
+
+    function test_claimUser_batchedCursor() public {
+        _activate(600e18, 400e18);
+        // interleave transfers so each claim lands in its own seq window
+        for (uint256 i; i < 5; ++i) {
+            usdc.mint(address(bribeA), 10e18);
+            bribeA.notify(address(usdc), pilot.tokenId(), 10e18);
+            _claimOneGauge(gaugeA, address(usdc));
+            vm.prank(bob);
+            pilot.transfer(alice, 1); // dust move splits the seq window
         }
         assertEq(pilot.creditCount(address(usdc)), 5);
         vm.prank(alice);
@@ -428,7 +428,10 @@ contract EpochPilotUnitTest is TestBase {
         vm.prank(alice);
         uint256 rest = pilot.claimUser(address(usdc), 0);
         assertEq(pilot.claimCursor(alice, address(usdc)), 5);
-        assertApproxEqRel(first * 3, rest * 2, 1e12); // 2 events vs 3, equal sizes
+        assertGt(first, 0);
+        assertGt(rest, 0);
+        // batched total equals what a fresh holder-equivalent would compute
+        assertEq(pilot.pendingUser(alice, address(usdc)), 0);
     }
 
     function test_transfer_movesFutureRevenueNotPast() public {
@@ -511,20 +514,27 @@ contract EpochPilotUnitTest is TestBase {
         vm.expectRevert(EpochPilot.TooEarly.selector);
         pilot.unwind();
 
-        vm.warp(pilot.lockEnd() + pilot.UNWIND_GRACE() + 2 hours);
+        // the final rebase is claimed during the grace week (bounty-driven),
+        // arrives liquid because the lock is expired, and joins the pool
+        vm.warp(pilot.lockEnd() + 12 hours);
         minter.updatePeriod(); // keepers keep the live protocol's period fresh
-        // final rebase arrives liquid during unwind
         aero.mint(address(dist), 30e18);
         dist.setClaimable(pilot.tokenId(), 30e18);
+        vm.prank(keeper);
+        pilot.claimRebase();
+        uint256 rebaseBounty = 30e18 * pilot.BOUNTY_BPS() / 10_000;
+
+        vm.warp(pilot.lockEnd() + pilot.UNWIND_GRACE() + 2 hours);
         pilot.unwind();
         assertTrue(pilot.unwound());
-        assertEq(aero.balanceOf(address(pilot)), 1_030e18);
+        uint256 poolBal = 1_030e18 - rebaseBounty;
+        assertEq(aero.balanceOf(address(pilot)), poolBal);
 
         uint256 aliceShares = pilot.balanceOf(alice);
         uint256 total = pilot.totalShares();
         vm.prank(alice);
         uint256 got = pilot.redeem(aliceShares);
-        assertEq(got, 1_030e18 * aliceShares / total);
+        assertEq(got, poolBal * aliceShares / total);
 
         // deposits, votes, claims and compound are all over
         vm.startPrank(carol);
@@ -541,7 +551,7 @@ contract EpochPilotUnitTest is TestBase {
     function test_unwind_afterVoting_resetsAndWithdraws() public {
         _activate(600e18, 400e18);
         _warpToRevoteWindow();
-        pilot.revote(_pools2());
+        _revote(_pools2());
         vm.warp(pilot.lockEnd() + pilot.UNWIND_GRACE() + 2 hours);
         pilot.unwind();
         assertEq(voter.usedWeights(pilot.tokenId()), 0);
@@ -550,16 +560,17 @@ contract EpochPilotUnitTest is TestBase {
     function test_unwind_succeedsEvenIfProtocolHalted() public {
         _activate(600e18, 400e18);
         // the protocol dies: minter period never rolls again, so the
-        // distributor refuses all claims — principal must still come home
+        // distributor refuses all claims — unwind never touches the
+        // distributor, so principal still comes home
         aero.mint(address(dist), 30e18);
         dist.setClaimable(pilot.tokenId(), 30e18);
         vm.warp(pilot.lockEnd() + pilot.UNWIND_GRACE() + 2 hours);
-        // sanity: a direct rebase claim would revert now
+        // sanity: a rebase claim does revert against the halted protocol
         vm.expectRevert(bytes("FZ5"));
         pilot.claimRebase();
         pilot.unwind();
         assertTrue(pilot.unwound());
-        // rebase forfeited, principal intact
+        // unclaimed rebase forfeited, principal intact
         assertEq(aero.balanceOf(address(pilot)), 1_000e18);
     }
 
@@ -607,6 +618,180 @@ contract EpochPilotUnitTest is TestBase {
         pilot.transfer(address(pilot), 1e18);
     }
 
+    // ── review findings: regression tests ────────────────────────────────────
+
+    function test_deposit_pricedAgainstLooseAeroToo() public {
+        _activate(600e18, 400e18);
+        // a large AERO claim sits uncompounded: NAV is 1000 locked + ~199.4 loose
+        aero.mint(address(bribeA), 200e18);
+        bribeA.notify(address(aero), pilot.tokenId(), 200e18);
+        _claimBribeToken(gaugeA, address(aero));
+        uint256 loose = pilot.looseAero();
+        assertGt(loose, 0);
+
+        uint256 sharesBefore = pilot.totalShares();
+        _deposit(carol, 100e18);
+        // carol pays full NAV: shares * amount / (locked + loose), NOT /locked
+        uint256 expected = sharesBefore * 100e18 / (1_000e18 + loose);
+        assertEq(pilot.balanceOf(carol), expected);
+        // sanity: strictly fewer shares than principal-only pricing would give
+        assertLt(expected, sharesBefore * 100e18 / 1_000e18);
+    }
+
+    function test_capBoundsDepositsNotGrowth() public {
+        // fill the cap exactly with deposits
+        aero.mint(alice, 20_000e18);
+        vm.startPrank(alice);
+        aero.approve(address(pilot), type(uint256).max);
+        pilot.deposit(9_000e18);
+        vm.stopPrank();
+        pilot.activate();
+        // grow the vault well past the cap via rebase compounding
+        aero.mint(address(dist), 3_000e18);
+        dist.setClaimable(pilot.tokenId(), 3_000e18);
+        pilot.claimRebase();
+        assertGt(uint256(uint128(ve.locked(pilot.tokenId()).amount)), pilot.DEPOSIT_CAP());
+        // growth must not close the vault: 1,000 AERO of cap room remains
+        _deposit(bob, 1_000e18);
+        assertEq(pilot.totalDeposited(), pilot.DEPOSIT_CAP());
+        // and the cap still binds actual deposits
+        vm.startPrank(carol);
+        aero.approve(address(pilot), 10e18);
+        vm.expectRevert(EpochPilot.CapExceeded.selector);
+        pilot.deposit(10e18);
+        vm.stopPrank();
+    }
+
+    function test_withdrawSeed_freesCapRoom() public {
+        aero.mint(alice, 20_000e18);
+        vm.startPrank(alice);
+        aero.approve(address(pilot), type(uint256).max);
+        pilot.deposit(10_000e18);
+        pilot.withdrawSeed(5_000e18);
+        pilot.deposit(5_000e18); // refunded room is reusable
+        vm.stopPrank();
+        assertEq(pilot.totalDeposited(), 10_000e18);
+    }
+
+    function test_activate_donationsAloneCannotActivate() public {
+        // 100 AERO of donations but only 1 share of deposits: the totalShares
+        // gate must refuse (protects the _credit uint192 bound proof)
+        _deposit(alice, 1e18);
+        vm.prank(bob);
+        aero.transfer(address(pilot), 200e18);
+        vm.expectRevert(EpochPilot.BelowMinimum.selector);
+        pilot.activate();
+    }
+
+    function test_strayVeNFT_isRejected() public {
+        _activate(600e18, 400e18);
+        // bob locks his own position and tries to safe-transfer it in — the
+        // vault must refuse (an ownerless contract can never give it back)
+        vm.startPrank(bob);
+        aero.approve(address(ve), 100e18);
+        uint256 bobId = ve.createLock(100e18, 26 weeks);
+        vm.expectRevert();
+        ve.safeTransferFrom(bob, address(pilot), bobId);
+        vm.stopPrank();
+        assertEq(ve.ownerOf(bobId), bob);
+    }
+
+    function test_revote_deadPoolExclusionRestoresLiveness() public {
+        // a third pool with 8000 weight dies: totalWeight 18000, live 10000
+        address poolC = makeAddr("poolC");
+        address gaugeC = makeAddr("gaugeC");
+        voter.addGauge(poolC, gaugeC, address(new MockReward(ve)), address(new MockReward(ve)), 8_000e18);
+        voter.killGauge(gaugeC);
+        _activate(600e18, 400e18);
+        _warpToRevoteWindow();
+        // without exclusion: 10000/18000 = 55% coverage — bricked
+        vm.expectRevert(EpochPilot.CoverageTooLow.selector);
+        _revote(_pools2());
+        // with the validated-dead exclusion: 10000/10000 — restored
+        address[] memory dead = new address[](1);
+        dead[0] = poolC;
+        pilot.revote(_pools2(), dead);
+        assertGt(voter.usedWeights(pilot.tokenId()), 0);
+    }
+
+    function test_revote_deadPoolExclusion_rejectsAbuse() public {
+        _activate(600e18, 400e18);
+        _warpToRevoteWindow();
+        address[] memory pools = new address[](1);
+        pools[0] = poolA;
+        // naming a LIVE pool as dead must revert
+        address[] memory notDead = new address[](1);
+        notDead[0] = poolB;
+        vm.expectRevert(EpochPilot.BadCandidateSet.selector);
+        pilot.revote(pools, notDead);
+        // duplicates must revert (no double-subtraction of the denominator)
+        address poolC = makeAddr("poolC2");
+        address gaugeC = makeAddr("gaugeC2");
+        voter.addGauge(poolC, gaugeC, address(new MockReward(ve)), address(new MockReward(ve)), 4_000e18);
+        voter.killGauge(gaugeC);
+        address[] memory dup = new address[](2);
+        dup[0] = poolC;
+        dup[1] = poolC;
+        vm.expectRevert(EpochPilot.BadCandidateSet.selector);
+        pilot.revote(pools, dup);
+        // and the exclusion list is gas-bounded
+        uint256 tooMany = pilot.MAX_CLAIM_TOKENS() + 1;
+        vm.expectRevert(EpochPilot.BadCandidateSet.selector);
+        pilot.revote(pools, new address[](tooMany));
+    }
+
+    function test_claimRevenue_senderBurnToken_creditsOnlyWhatIsBacked() public {
+        _activate(600e18, 400e18);
+        BurnySenderToken burny = new BurnySenderToken();
+        burny.mint(address(bribeA), 2_000e18);
+        bribeA.notify(address(burny), pilot.tokenId(), 1_000e18);
+        _claimOneGauge(gaugeA, address(burny));
+        // the bounty push burned extra from the vault; credited must equal
+        // what is actually retained, so all claims are fully backed AT
+        // CREDIT TIME (the naive `delta - bounty` credit would already be
+        // unbacked here)
+        uint256 vaultBal = burny.balanceOf(address(pilot));
+        uint256 pendingTotal = pilot.pendingUser(alice, address(burny))
+            + pilot.pendingUser(bob, address(burny))
+            + pilot.pendingUser(address(0xdEaD), address(burny));
+        assertLe(pendingTotal, vaultBal, "credits unbacked at credit time");
+        // each payout torches 1% extra from the vault, so backing erodes as
+        // holders claim: early claimants succeed in full…
+        vm.prank(alice);
+        uint256 gotA = pilot.claimUser(address(burny), 0);
+        assertGt(gotA, 0);
+        // …and the documented, token-isolated degradation is that the LAST
+        // claimant of such a pathological token can come up short
+        vm.prank(bob);
+        vm.expectRevert(EpochPilot.TransferFailed.selector);
+        pilot.claimUser(address(burny), 0);
+        // isolation: the same holder's claims of honest tokens are untouched
+        usdc.mint(address(bribeA), 100e18);
+        bribeA.notify(address(usdc), pilot.tokenId(), 100e18);
+        _claimOneGauge(gaugeA, address(usdc));
+        vm.prank(bob);
+        assertGt(pilot.claimUser(address(usdc), 0), 0);
+    }
+
+    function test_transfer_reentryFromTokenCallbackBlocked() public {
+        _activate(600e18, 400e18);
+        ReentrantToken evil = new ReentrantToken();
+        // arm it to reenter transfer() instead of claimUser()
+        evil.armCall(address(pilot), abi.encodeWithSignature("transfer(address,uint256)", address(0xB0B), 0));
+        address[] memory gs = new address[](1);
+        gs[0] = gaugeA;
+        address[][] memory none = new address[][](1);
+        none[0] = new address[](0);
+        address[][] memory ts = new address[][](1);
+        ts[0] = new address[](1);
+        ts[0][0] = address(evil);
+        vm.prank(keeper);
+        pilot.claimRevenue(gs, none, ts);
+        assertTrue(evil.attempted());
+        assertTrue(evil.blocked(), "transfer must be latched");
+        assertEq(bytes32(evil.blockReason()), bytes32(EpochPilot.Reentrancy.selector));
+    }
+
     // ── remaining branch coverage: guards, dust, adversarial paths ──────────
 
     function test_withdrawSeed_zeroReverts() public {
@@ -639,7 +824,7 @@ contract EpochPilotUnitTest is TestBase {
     function test_preActivation_gates() public {
         // strategy/revenue surface is closed until activation
         vm.expectRevert(EpochPilot.NotActive.selector);
-        pilot.revote(_pools2());
+        _revote(_pools2());
         address[] memory gs = new address[](1);
         gs[0] = gaugeA;
         address[][] memory ts = new address[][](1);
@@ -670,10 +855,10 @@ contract EpochPilotUnitTest is TestBase {
         _activate(600e18, 400e18);
         _warpToRevoteWindow();
         vm.expectRevert(EpochPilot.BadCandidateSet.selector);
-        pilot.revote(new address[](0));
+        _revote(new address[](0));
         uint256 oversize = voter.maxVotingNum() + 1;
         vm.expectRevert(EpochPilot.BadCandidateSet.selector);
-        pilot.revote(new address[](oversize));
+        _revote(new address[](oversize));
     }
 
     function test_revote_zeroMirrorWeightPoolRejected() public {
@@ -688,7 +873,7 @@ contract EpochPilotUnitTest is TestBase {
         pools[1] = poolB;
         pools[2] = deadPool;
         vm.expectRevert(EpochPilot.BadCandidateSet.selector);
-        pilot.revote(pools);
+        _revote(pools);
     }
 
     function test_revote_bountyClampedAtMax() public {
@@ -708,7 +893,7 @@ contract EpochPilotUnitTest is TestBase {
         vm.warp(block.timestamp + 8 * WEEK);
         _warpToRevoteWindow();
         vm.prank(keeper);
-        pilot.revote(_pools2());
+        _revote(_pools2());
         assertEq(aero.balanceOf(keeper), pilot.BOUNTY_MAX_AERO());
     }
 

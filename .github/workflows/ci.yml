@@ -2,11 +2,17 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   schedule:
-    # nightly: re-prove reproducibility and (when secrets allow) re-assert
-    # the live-protocol facts and the deployed-bytecode diff
+    # nightly: re-prove reproducibility against the recorded release hash and
+    # re-assert the live-protocol facts
     - cron: "17 4 * * *"
+
+# a push to an open PR must not run the pipeline twice
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FOUNDRY_PROFILE: ci
@@ -16,6 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: forge build
       - run: ./scripts/banned-constructs.sh
 
   build-and-test:
@@ -31,7 +41,9 @@ jobs:
         run: forge test --no-match-path 'test/fork/*' -vv
 
   fork-tests:
-    # asserts every load-bearing protocol fact (G9/G10) against live Base
+    # asserts every load-bearing protocol fact (G9/G10) against live Base.
+    # On the nightly schedule a missing RPC secret is a hard failure — the
+    # drift-detection job must never be able to go silently green.
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' }}
     steps:
@@ -44,13 +56,17 @@ jobs:
           BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
         run: |
           if [ -z "$BASE_RPC_URL" ]; then
-            echo "BASE_RPC_URL secret not configured — skipping fork suite"
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "BASE_RPC_URL secret is not configured — the nightly protocol-drift check cannot run" >&2
+              exit 1
+            fi
+            echo "BASE_RPC_URL secret not configured — skipping fork suite on this event"
             exit 0
           fi
           forge test --match-path 'test/fork/*' -vv
 
   reproducible-build:
-    # §8: a clean clone must produce byte-identical bytecode
+    # §8: a clean clone must produce byte-identical bytecode (every run)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,12 +80,28 @@ jobs:
           forge clean && forge build
           H2=$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])" | sha256sum)
           [ "$H1" = "$H2" ] && echo "reproducible: $H1" || { echo "NON-REPRODUCIBLE BUILD"; exit 1; }
+
+  release-hash:
+    # release-integrity gate: compares against the recorded hash in
+    # verification/README.md. Deliberately NOT run per-push — on every commit
+    # it would train reviewers to rubber-stamp hash bumps; it belongs where
+    # the record must hold: the nightly (deployed-artifact drift) and tags.
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
       - name: Diff against recorded release hash
         run: |
-          RECORDED=0x47f9f1036eb0767300f49be1ff2986c0b3fa313eca9161793fcbb98124b223ac
+          forge build
+          RECORDED=$(grep 'runtime bytecode keccak256' verification/README.md | grep -oE '0x[0-9a-f]{64}')
           BUILT=$(cast keccak "$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])")")
+          echo "recorded: $RECORDED"
+          echo "built:    $BUILT"
           if [ "$BUILT" != "$RECORDED" ]; then
-            echo "runtime bytecode hash drifted from verification/README.md: $BUILT"
+            echo "runtime bytecode hash drifted from verification/README.md"
             echo "(update the record only as part of an intentional, re-audited release)"
             exit 1
           fi

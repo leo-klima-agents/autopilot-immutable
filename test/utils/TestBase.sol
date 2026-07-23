@@ -32,9 +32,8 @@ abstract contract TestBase {
     /// @dev keccak256("hevm cheat code") — the canonical cheatcode address.
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    /// @dev forge's test-failure sentinel (read by the runner even when the
-    ///      test does not revert). Set on any failed non-reverting assertion.
-    bool public failed;
+    /// @dev Aerodrome epoch length — one definition for every suite.
+    uint256 internal constant WEEK = 7 days;
 
     function makeAddr(string memory name_) internal returns (address a) {
         a = address(uint160(uint256(keccak256(bytes(name_)))));

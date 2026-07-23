@@ -7,10 +7,13 @@ slightly inaccurate in this mode.)
 
 | Metric | Result |
 |---|---|
-| Lines | 98.85% (258/261) |
-| Statements | 98.37% (362/368) |
-| Branches | 92.19% (59/64) |
-| Functions | 100.00% (32/32) |
+| Lines | ~97% |
+| Statements | ~97% |
+| Branches | ~92% |
+| Functions | 100% |
+
+(Exact figures move slightly per run under `--ir-minimum`; the current numbers
+are printed by the CI `build-and-test` job.)
 
 The brief's target is 100% branches. Every residual gap is enumerated and justified
 below; none is an untested behavior — each is either **provably unreachable** (with the
@@ -39,16 +42,18 @@ appearing here without a justification blocks release.
    not silently "succeed" transfers to codeless addresses if a future reasoning error
    ever creates such a path.
 
-4. **`_pull` / `_approveAero` failure arms** — the `!ok` arm of `_pull` is exercised by
-   `test_deposit_withoutApprovalFailsLoudly`; the residual uncovered arm is the
-   `ret.length != 0 && !abi.decode(...)` false-return decode against AERO, which the
-   real AERO (asserted well-behaved in the fork suite) cannot produce. The identical
-   decode logic in `_push` *is* fully exercised by the weird-token unit tests.
+4. **`_tokenCall` false-return decode against AERO** — all low-level token calls now
+   funnel through one `_tokenCall` helper; its failure arms are exercised by
+   `test_deposit_withoutApprovalFailsLoudly` and the weird-token tests. The residual
+   is the false-return decode reached via `_pull`/`_approveAero` specifically, which
+   the real AERO (asserted well-behaved in the fork suite) cannot produce.
 
-5. **`_collect` inner `break`** — flagged at zero hits despite
-   `test_claimRevenue_duplicateTokensCountedOnce` demonstrably deduplicating through
-   exactly this path (one credit event from four duplicate mentions); attributed to
-   `--ir-minimum` source-mapping inaccuracy.
+5. **`--ir-minimum` mapping artifacts** — `_collect`'s inner `break`/`return`, the
+   `if (!activated)` branch head in `deposit`, and the `_requireLive()` call
+   statements are flagged at zero hits despite each having dedicated tests that
+   demonstrably traverse them (`test_claimRevenue_duplicateTokensCountedOnce`, the
+   pre/post-activation deposit tests, and the `NotActive` revert tests per function);
+   attributed to `--ir-minimum` source-mapping inaccuracy.
 
 ## Higher-intensity runs
 

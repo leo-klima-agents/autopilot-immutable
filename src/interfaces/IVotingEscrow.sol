@@ -33,5 +33,4 @@ interface IVotingEscrow {
     function locked(uint256 tokenId) external view returns (LockedBalance memory);
     function ownerOf(uint256 tokenId) external view returns (address);
     function balanceOfNFT(uint256 tokenId) external view returns (uint256);
-    function isApprovedOrOwner(address spender, uint256 tokenId) external view returns (bool);
 }

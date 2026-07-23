@@ -81,6 +81,24 @@ contract RevertingToken is MockERC20 {
     }
 }
 
+/// @dev Burns an EXTRA 1% from the sender on every transfer (beyond the
+///      amount delivered) — the weird-erc20 case where the vault's balance
+///      falls by more than it pays out, leaving naive credits unbacked.
+contract BurnySenderToken is MockERC20 {
+    uint256 public constant BURN_BPS = 100; // extra 1% torched from sender
+
+    constructor() MockERC20("Burny Token", "BURNY") {}
+
+    function transfer(address to, uint256 amt) public override returns (bool) {
+        uint256 burn = amt * BURN_BPS / 10_000;
+        require(balanceOf[msg.sender] >= amt + burn, "bal");
+        balanceOf[msg.sender] -= amt + burn;
+        balanceOf[to] += amt;
+        totalSupply -= burn;
+        return true;
+    }
+}
+
 /// @dev Lies about its balance: reported balance grows with gas consumed so
 ///      far in the transaction, so a later (post-claim) read always exceeds an
 ///      earlier (pre-claim) read and any delta measurement sees a phantom
@@ -103,14 +121,20 @@ contract PhantomBalanceToken {
 ///      the revert, so tests can assert the latch tripped.
 contract ReentrantToken {
     address public target;
-    address public reenterToken;
+    bytes public payload;
     bool public attempted;
     bool public blocked;
     bytes4 public blockReason;
 
     function arm(address target_, address token_) external {
         target = target_;
-        reenterToken = token_;
+        payload = abi.encodeWithSignature("claimUser(address,uint256)", token_, 0);
+    }
+
+    /// @dev Generic variant: reenter with arbitrary calldata.
+    function armCall(address target_, bytes calldata payload_) external {
+        target = target_;
+        payload = payload_;
     }
 
     function balanceOf(address) external view returns (uint256) {
@@ -120,8 +144,7 @@ contract ReentrantToken {
     function transfer(address, uint256) external returns (bool) {
         // bounce straight back into the vault; the transient latch must trip
         attempted = true;
-        (bool ok, bytes memory ret) =
-            target.call(abi.encodeWithSignature("claimUser(address,uint256)", reenterToken, 0));
+        (bool ok, bytes memory ret) = target.call(payload);
         if (!ok) {
             blocked = true;
             if (ret.length >= 4) blockReason = bytes4(ret);
@@ -226,6 +249,19 @@ contract MockVotingEscrow {
         delete _locked[id];
         delete ownerOf[id];
         aero.transfer(msg.sender, uint256(uint128(l.amount)));
+    }
+
+    function safeTransferFrom(address from, address to, uint256 id) external {
+        require(ownerOf[id] == msg.sender && from == msg.sender, "auth");
+        ownerOf[id] = to;
+        if (to.code.length > 0) {
+            (bool ok, bytes memory ret) = to.call(
+                abi.encodeWithSignature(
+                    "onERC721Received(address,address,uint256,bytes)", msg.sender, from, id, ""
+                )
+            );
+            require(ok && ret.length >= 32, "unsafe receiver");
+        }
     }
 
     function balanceOfNFT(uint256 id) public view returns (uint256) {

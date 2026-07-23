@@ -20,9 +20,9 @@
 | CREATE2 factory | `0x4e59b44847b379578588920cA78FbF26c0B4956C` (canonical deterministic-deployment proxy) |
 | salt | `keccak256("tranche-pilot/EpochPilot/series-1")` = `0x2f4ab442c035d1a9c8b5950925f27d098fe4ed5b40ce69733f5c794ee2d39481` |
 | constructor arg | Voter, resolved on-chain at deploy time (see `addresses.md`); `0x16613524e02ad97eDfeF371bC883F2F5d6C480A5` at the recorded block |
-| init code hash | `0xcc9065d7bc8ff98b7c495374c55e44988158aa5684188c894d0c28feb88e70d7` |
-| **derived address** | `0x2883C715e5f8c1edE4b95d96F2ADFA2E70aBc654` |
-| runtime bytecode keccak256 | `0x47f9f1036eb0767300f49be1ff2986c0b3fa313eca9161793fcbb98124b223ac` |
+| init code hash | `0x13cb4d11883d4f9434d146d9b749f7ba021bdc192a24c2f8db0d1909df83bf1b` |
+| **derived address** | `0x8C4092697c08EE852CEff35a95920CE19CCc73af` |
+| runtime bytecode keccak256 | `0xe18d75bce8767a926911b1d921c370c4f518ea6afc05948ba6891adb6353f241` |
 
 Re-derive the address yourself:
 
@@ -44,15 +44,27 @@ cast keccak "$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/
 # → must equal the runtime bytecode hash above
 ```
 
-Against the deployed contract (post-deployment):
+Against the deployed contract (post-deployment): a raw `cast code` diff would
+show mismatches at the contract's five immutable-reference sites (the compiler
+artifact carries zeroed placeholders that CREATE2 fills at construction), so
+byte-equality is proven a different way — **the address itself is the proof**.
+CREATE2 addresses commit to the full init code: if the contract exists at the
+derived address above, the deployed creation bytecode (and therefore the source,
+compiler and settings) matched this repository exactly. Check both directions:
 
 ```
-diff <(cast code 0x2883C715e5f8c1edE4b95d96F2ADFA2E70aBc654 --rpc-url $BASE_RPC_URL) \
-     <(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])")
+# 1. the deployed address matches the derivation from the local build
+cast create2 --deployer 0x4e59b44847b379578588920cA78FbF26c0B4956C \
+  --salt $(cast keccak "tranche-pilot/EpochPilot/series-1") \
+  --init-code-hash $(cast keccak "$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['bytecode']['object'])")$(cast abi-encode 'constructor(address)' <voter> | cut -c3-)")
+
+# 2. code exists at that address
+cast code <derived-address> --rpc-url $BASE_RPC_URL | head -c 20
 ```
 
-(Byte-identical including metadata, because the toolchain is fully pinned and
-`bytecode_hash = "ipfs"` is recorded here rather than stripped.)
+Sourcify's full-match verification independently proves the same equality (it
+accounts for immutables), and `bytecode_hash = "ipfs"` keeps the metadata hash
+in the deployed code so the match is exact, not partial.
 
 ## Verification order (must both be live before seeding)
 

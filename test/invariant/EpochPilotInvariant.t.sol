@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {TestBase, Vm} from "../utils/TestBase.sol";
+import {MockFixture} from "../utils/MockFixture.sol";
 import {EpochPilot} from "../../src/EpochPilot.sol";
 import {
     MockERC20,
@@ -92,18 +93,16 @@ contract Handler is TestBase {
         if (!_live() && pilot.activated()) return;
         amount = amount % 500e18 + 1e18;
         address a = _actor(actorSeed);
-        // respect the cap so the call meaningfully exercises state
-        uint256 principal = pilot.activated()
-            ? uint256(uint128(ve.locked(pilot.tokenId()).amount))
-            : pilot.totalShares();
-        if (principal + amount > pilot.DEPOSIT_CAP()) return;
+        // respect the cap (bounds cumulative deposits, not TVL) so the call
+        // meaningfully exercises state
+        if (pilot.totalDeposited() + amount > pilot.DEPOSIT_CAP()) return;
         vm.prank(a);
         pilot.deposit(amount);
     }
 
     function activateIfReady() external {
         if (pilot.activated()) return;
-        if (aero.balanceOf(address(pilot)) < pilot.ACTIVATION_MIN()) return;
+        if (pilot.totalShares() < pilot.ACTIVATION_MIN()) return;
         pilot.activate();
     }
 
@@ -170,13 +169,14 @@ contract Handler is TestBase {
         vm.warp(block.timestamp + hop % 3 days);
         if (!_live()) return;
         uint256 flip = voter.epochNext(block.timestamp);
-        if (block.timestamp < flip - 6 hours || block.timestamp >= flip - 1 hours) return;
+        if (block.timestamp < flip - pilot.REVOTE_OPEN()) return;
+        if (block.timestamp > voter.epochVoteEnd(block.timestamp)) return;
         if (voter.lastVoted(pilot.tokenId()) >= voter.epochStart(block.timestamp)) return;
         if (ve.balanceOfNFT(pilot.tokenId()) == 0) return;
         address[] memory pools = new address[](2);
         pools[0] = pool;
         pools[1] = pool2;
-        pilot.revote(pools);
+        pilot.revote(pools, new address[](0));
     }
 
     function donateAero(uint256 amount) external {
@@ -202,26 +202,12 @@ contract Handler is TestBase {
     }
 }
 
-contract EpochPilotInvariantTest is TestBase {
+contract EpochPilotInvariantTest is MockFixture {
     Handler handler;
-    EpochPilot pilot;
-    MockERC20 aero;
     MockERC20 usdc;
-    MockVotingEscrow ve;
-    MockVoter voter;
 
     function setUp() public {
-        vm.warp(1_784_764_800 + 2 days);
-        aero = new MockERC20("Aerodrome", "AERO");
-        ve = new MockVotingEscrow(aero);
-        voter = new MockVoter(ve);
-        MockMinter minter = new MockMinter();
-        minter.updatePeriod();
-        voter.setMinter(address(minter));
-        MockRewardsDistributor dist = new MockRewardsDistributor(ve, aero, minter);
-        ve.setVoter(address(voter));
-        ve.setDistributor(address(dist));
-        pilot = new EpochPilot(address(voter));
+        _deployMockProtocol();
         MockReward bribe = new MockReward(ve);
         MockReward fees = new MockReward(ve);
         address pool = makeAddr("ipool");

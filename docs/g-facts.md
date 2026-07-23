@@ -17,6 +17,7 @@ live protocol contradicts the brief (documented, code adjusted).
 | G9g | Epoch windows: `epochVoteStart = start+1h`, `epochVoteEnd = flip−1h` | **verified-live** | `test_fork_G9_epochWindows` |
 | G9h | `gaugeToFees` / `gaugeToBribe` registries validate claim targets | **verified-live** | `test_fork_G9_gaugeRewardRegistries` |
 | G10 | Rebase claims permissionless per tokenId; auto-compound into unexpired locks via `depositFor` | **verified-live** — asserted on a real third-party mainnet veNFT: a stranger's `claim()` increased the lock's amount by exactly `claimable` | `test_fork_G10_rebasePermissionlessAutoCompounds` |
+| G10b | Expired-lock rebase pays the owner **liquid** AERO (the branch `claimRebase`'s post-expiry accounting depends on); the distributor refuses claims while the minter period is stale | **verified-live** — a lock walked past expiry on the fork: stale-period claim reverts, post-`updatePeriod` claim pays the owner liquid, lock amount untouched | `test_fork_G10_expiredLockRebasePaysOwnerLiquid` |
 | — | AERO is a well-behaved ERC-20 (returns true, no fee) | **verified-live** | `test_fork_aeroIsWellBehavedERC20` |
 
 ## v3 facts (TranchePilot — spec-freeze gate; diff each Aero code batch from Aug 3, 2026)

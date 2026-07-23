@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {TestBase} from "../utils/TestBase.sol";
+import {BaseMainnet} from "../utils/BaseMainnet.sol";
 import {EpochPilot} from "../../src/EpochPilot.sol";
 import {IVoter} from "../../src/interfaces/IVoter.sol";
 import {IVotingEscrow} from "../../src/interfaces/IVotingEscrow.sol";
@@ -30,10 +31,8 @@ interface IPool {
 ///        deposit → activate → mirror revote → revenue claim → rebase claim →
 ///        term expiry → unwind → redeem.
 contract EpochPilotForkTest is TestBase {
-    address constant AERO_TOKEN = 0x940181a94A35A4569E4529A3CDfB74e38FD98631;
-    uint256 constant WEEK = 7 days;
-    /// @dev Pinned for determinism and RPC-cache reuse; override with BASE_FORK_BLOCK.
-    uint256 constant FORK_BLOCK = 49_016_010;
+    address constant AERO_TOKEN = BaseMainnet.AERO;
+    uint256 constant FORK_BLOCK = BaseMainnet.FORK_BLOCK;
 
     IERC20Meta aero;
     IVoter voter;
@@ -140,11 +139,11 @@ contract EpochPilotForkTest is TestBase {
         if (!found) return vm.skip(true); // coverage unreachable in scanned prefix at this block
         _warpToRevoteWindow();
         vm.prank(keeper);
-        pilot.revote(pools);
+        pilot.revote(pools, new address[](0));
         assertGt(voter.usedWeights(id), 0, "vote landed");
         // window is enforced: a second call this epoch dies at the protocol
         vm.expectRevert();
-        pilot.revote(pools);
+        pilot.revote(pools, new address[](0));
 
         // ── revenue claim: registry-validated targets, zero-delta tolerant ──
         address gauge = voter.gauges(pools[0]);
@@ -207,7 +206,7 @@ contract EpochPilotForkTest is TestBase {
         address[] memory pools = new address[](1);
         pools[0] = one;
         vm.expectRevert(EpochPilot.CoverageTooLow.selector);
-        pilot.revote(pools);
+        pilot.revote(pools, new address[](0));
     }
 
     function test_fork_zeroAdminSurface_probeStateChangers() public {

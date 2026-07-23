@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {TestBase} from "../utils/TestBase.sol";
+import {BaseMainnet} from "../utils/BaseMainnet.sol";
 import {IVoter} from "../../src/interfaces/IVoter.sol";
 import {IVotingEscrow} from "../../src/interfaces/IVotingEscrow.sol";
 import {IRewardsDistributor} from "../../src/interfaces/IRewardsDistributor.sol";
@@ -27,13 +28,11 @@ interface IMinter {
 ///        cross-checking every back-reference. This mirrors exactly what the
 ///        EpochPilot constructor does from the Voter.
 contract AerodromeFactsForkTest is TestBase {
-    uint256 constant WEEK = 7 days;
     uint256 constant HOUR = 1 hours;
 
     /// @dev Root of trust; identity asserted in test_addressResolution.
-    address constant AERO_TOKEN = 0x940181a94A35A4569E4529A3CDfB74e38FD98631;
-    /// @dev Pinned for determinism and RPC-cache reuse; override with BASE_FORK_BLOCK.
-    uint256 constant FORK_BLOCK = 49_016_010;
+    address constant AERO_TOKEN = BaseMainnet.AERO;
+    uint256 constant FORK_BLOCK = BaseMainnet.FORK_BLOCK;
 
     IERC20Meta aero;
     IMinter minter;
@@ -236,6 +235,32 @@ contract AerodromeFactsForkTest is TestBase {
         assertEq(uint256(uint128(ve.locked(id).amount)), lockedBefore + got);
     }
 
+    /// @dev The expired-lock branch: the rebase must arrive LIQUID to the
+    ///      owner (claimRebase's post-expiry `looseAero += amount` accounting
+    ///      depends on it). Asserted with a real lock walked past expiry —
+    ///      no candidate scan, so this can never silently skip.
+    function test_fork_G10_expiredLockRebasePaysOwnerLiquid() public {
+        if (skipAll) return vm.skip(true);
+        address user = makeAddr("expiredUser");
+        uint256 id = _fundAndLock(user, 500e18);
+        // walk past expiry; the distributor refuses claims while the minter
+        // period is stale, so this asserts the gate too, then rolls it
+        vm.warp(ve.locked(id).end + 1 days);
+        vm.prank(makeAddr("stranger3"));
+        vm.expectRevert(); // stale minter period on the warped fork
+        dist.claim(id);
+        // roll the period the way live keepers do
+        IMinterUpdate(address(minter)).updatePeriod();
+        uint256 claimable = dist.claimable(id);
+        uint256 balBefore = aero.balanceOf(user);
+        vm.prank(makeAddr("stranger3"));
+        uint256 got = dist.claim(id);
+        assertEq(got, claimable);
+        // expired path: paid to the owner as liquid AERO, not compounded
+        assertEq(aero.balanceOf(user) - balBefore, got);
+        assertEq(uint256(uint128(ve.locked(id).amount)), 500e18, "lock amount untouched");
+    }
+
     // ── AERO token behavior our low-level plumbing assumes ──────────────────
 
     function test_fork_aeroIsWellBehavedERC20() public {
@@ -254,4 +279,8 @@ contract AerodromeFactsForkTest is TestBase {
 interface IVoterEnum {
     function pools(uint256 i) external view returns (address);
     function length() external view returns (uint256);
+}
+
+interface IMinterUpdate {
+    function updatePeriod() external returns (uint256);
 }

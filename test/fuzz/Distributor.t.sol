@@ -1,50 +1,35 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {TestBase} from "../utils/TestBase.sol";
-import {EpochPilot} from "../../src/EpochPilot.sol";
-import {
-    MockERC20,
-    MockVotingEscrow,
-    MockVoter,
-    MockMinter,
-    MockReward,
-    MockRewardsDistributor
-} from "../mocks/MockProtocol.sol";
+import {MockFixture} from "../utils/MockFixture.sol";
+import {MockReward} from "../mocks/MockProtocol.sol";
+import {MockERC20} from "../mocks/MockProtocol.sol";
 
 /// @dev Property test of the event-sourced distributor: for a random
 ///      interleaving of share transfers and revenue credits, every user's
-///      claim must equal the reference model computed from balances observed
-///      at each credit event — exactly, since the arithmetic is identical —
-///      and total payouts can never exceed total credits (invariant 3, §5.4).
-contract DistributorFuzzTest is TestBase {
-    MockERC20 aero;
-    MockVotingEscrow ve;
-    MockVoter voter;
-    MockRewardsDistributor dist;
-    EpochPilot pilot;
+///      claim must equal a reference model that replicates the contract's
+///      arithmetic exactly — including credit coalescing: credits between two
+///      balance changes share one entry whose perShare values sum, and the
+///      payout floor-division is applied once per entry (window), not once
+///      per credit. Total payouts can never exceed total credits
+///      (invariant 3, §5.4).
+contract DistributorFuzzTest is MockFixture {
     MockReward bribe;
     MockERC20 usdc;
     address pool = makeAddr("pool");
     address gauge = makeAddr("gauge");
     address keeper = makeAddr("keeper");
 
-    uint256 constant ACC = 1e27;
     uint256 constant N = 4;
     address[N] actors;
 
+    // reference model state: the currently-open coalescing window
+    uint256[N] winBal; // balances in force for the open window
+    uint256 winPerShare; // summed perShare of credits in the open window
+    uint256[N] expected;
+
     function setUp() public {
-        vm.warp(1_784_764_800 + 2 days);
-        aero = new MockERC20("Aerodrome", "AERO");
-        ve = new MockVotingEscrow(aero);
-        voter = new MockVoter(ve);
-        MockMinter minter = new MockMinter();
-        minter.updatePeriod();
-        voter.setMinter(address(minter));
-        dist = new MockRewardsDistributor(ve, aero, minter);
-        ve.setVoter(address(voter));
-        ve.setDistributor(address(dist));
-        pilot = new EpochPilot(address(voter));
+        _deployMockProtocol();
         bribe = new MockReward(ve);
         voter.addGauge(pool, gauge, address(new MockReward(ve)), address(bribe), 1_000e18);
         usdc = new MockERC20("USD Coin", "USDC");
@@ -66,52 +51,60 @@ contract DistributorFuzzTest is TestBase {
     function _credit(uint256 amount) internal returns (uint256 credited) {
         usdc.mint(address(bribe), amount);
         bribe.notify(address(usdc), pilot.tokenId(), amount);
-        address[] memory gs = new address[](1);
-        gs[0] = gauge;
-        address[][] memory none = new address[][](1);
-        none[0] = new address[](0);
-        address[][] memory ts = new address[][](1);
-        ts[0] = new address[](1);
-        ts[0][0] = address(usdc);
         vm.prank(keeper);
-        pilot.claimRevenue(gs, none, ts);
+        _claimBribeToken(gauge, address(usdc));
         credited = amount - amount * pilot.BOUNTY_BPS() / 10_000;
     }
 
-    /// @dev PRNG step.
+    /// @dev Close the open reference window: pay each actor floor(bal × sum / ACC).
+    function _flushWindow() internal {
+        if (winPerShare == 0) return;
+        uint256 acc = pilot.ACC();
+        for (uint256 i; i < N; ++i) {
+            expected[i] += winBal[i] * winPerShare / acc;
+        }
+        winPerShare = 0;
+    }
+
     function _rng(uint256 state) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(state)));
     }
 
     function testFuzz_distributorExactUnderTransfers(uint256 seed) public {
-        uint256[N] memory expected;
         uint256 totalCredited;
         uint256 r = seed;
+        uint256 acc = pilot.ACC();
 
         for (uint256 step; step < 24; ++step) {
             r = _rng(r);
             if (r % 3 == 0) {
-                // credit revenue: replicate the contract's exact math against
-                // balances read at the moment of the event
+                // credit revenue: same-window credits coalesce, so the model
+                // records each credit's individually-floored perShare into
+                // the open window using balances at the window's start
                 uint256 amount = 1e6 + (r >> 8) % 1_000e18;
+                if (winPerShare == 0) {
+                    for (uint256 i; i < N; ++i) {
+                        winBal[i] = pilot.balanceOf(actors[i]);
+                    }
+                }
                 uint256 credited = _credit(amount);
                 totalCredited += credited;
-                uint256 perShare = credited * ACC / pilot.totalShares();
-                for (uint256 i; i < N; ++i) {
-                    expected[i] += pilot.balanceOf(actors[i]) * perShare / ACC;
-                }
+                winPerShare += credited * acc / pilot.totalShares();
             } else {
-                // transfer shares between random actors
+                // transfer shares: closes the window (balance checkpoint
+                // bumps the sequence)
                 uint256 from = (r >> 16) % N;
                 uint256 to = (r >> 24) % N;
                 if (from == to) continue;
                 uint256 bal = pilot.balanceOf(actors[from]);
                 if (bal == 0) continue;
+                _flushWindow();
                 uint256 amt = (r >> 32) % bal + 1;
                 vm.prank(actors[from]);
                 pilot.transfer(actors[to], amt);
             }
         }
+        _flushWindow();
 
         uint256 totalPaid;
         for (uint256 i; i < N; ++i) {
@@ -123,7 +116,6 @@ contract DistributorFuzzTest is TestBase {
         // no-loss: users can never pull more than was credited (dust from
         // floor division and the dead shares' unclaimed slice stay behind)
         assertLe(totalPaid, totalCredited, "paid > credited");
-        assertLe(totalPaid, usdc.balanceOf(address(pilot)) + totalPaid, "balance underflow");
         // second claim pays nothing
         vm.prank(actors[0]);
         assertEq(pilot.claimUser(address(usdc), 0), 0);
@@ -139,7 +131,7 @@ contract DistributorFuzzTest is TestBase {
             vm.prank(actors[0]);
             pilot.transfer(actors[1], amt);
         }
-        // one-shot expectation from the view
+        // one-shot expectation from the view (shared _accrue body)
         uint256 want = pilot.pendingUser(actors[1], address(usdc));
         uint256 got;
         uint256 step = uint256(batch) % 3 + 1;

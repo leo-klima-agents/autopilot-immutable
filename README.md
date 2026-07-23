@@ -27,16 +27,22 @@ return by construction). v2's synchronized weekly epochs offer no reactivity edg
 PoC demonstrates *machinery*, not alpha:
 
 - `deposit` — 1:1 refundable during seeding; pro-rata and irrevocable after `activate()`.
-- `revote(pools)` — anyone, weekly, inside `[flip−6h, flip−1h)`; candidate set must carry
-  ≥ 80% of total vote weight (the on-chain check that defeats self-serving subsets);
-  caller earns an **escalating bounty** that ramps with staleness (brief §3.4) — the sole
-  liveness mechanism, deliberately field-tested here before v3 relies on it.
+- `revote(pools, deadPools)` — anyone, weekly, from 6h before the flip until the Voter's
+  live `epochVoteEnd`; candidate set must carry ≥ 80% of live vote weight (the on-chain
+  check that defeats self-serving subsets; `deadPools` lets callers exclude
+  validated-dead gauges from the denominator so a big gauge kill can't brick the
+  strategy); caller earns an **escalating bounty** that ramps with staleness (brief
+  §3.4) — the sole liveness mechanism, deliberately field-tested here before v3 relies
+  on it.
 - `claimRevenue(gauges, feeTokens, bribeTokens)` — anyone; targets validated against the
   Voter's own registry; balance-delta accounting (fee-on-transfer safe); caller earns 0.3%
   of each claimed token in kind. AERO revenue is never distributed — it is compounded.
 - `claimRebase` / `compound` — anyone, bountied; both grow the locked principal.
 - `unwind` → `redeem` — after term + 1-week grace, anyone burns the expired lock back to
   liquid AERO; shareholders redeem pro-rata. Non-AERO revenue stays claimable forever.
+  Unwind touches nothing but the Voter and the escrow, so principal recovery works even
+  if the rest of the protocol has halted (the final rebase is claimed separately during
+  the grace week).
 
 Revenue distribution is **event-sourced** (per-token credit events + per-user balance
 checkpoints) rather than the classic per-token reward-debt pattern, which is unsound for

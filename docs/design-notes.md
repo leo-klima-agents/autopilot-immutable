@@ -59,13 +59,25 @@ existing holders' expense). EpochPilot therefore derives principal from
 amounts): **any state that can be moved by a third-party call must be read from the
 protocol, never shadowed.**
 
-## Finding 4 — unwind needs a grace period (v2-specific)
+## Finding 4 — unwind needs a grace period, and must not depend on protocol upkeep
 
 `unwind()` burns the veNFT; every claim path needs the NFT alive. A permissionless
 unwind callable at expiry would let a griefer torch the final epoch's unclaimed
 revenue. `UNWIND_GRACE = 1 week` gives bounty-hunters a full epoch to drain claims
-first. TranchePilot has no unwind (permanent stakes), so this does not carry over —
-recorded for completeness.
+first.
+
+The second half was found in review: an early version claimed the final rebase inside
+`unwind()`, first unconditionally (bricked on a fork reproducing a halted protocol —
+the distributor refuses claims while the minter's period is stale), then behind a
+hand-copied mirror of the distributor's staleness precondition. The mirror was still
+wrong in kind: it replicated *one* observed guard (`activePeriod`) of a foreign
+contract whose real gate is time-cursor-based, and the only thing validating the copy
+was a mock written to match it. The fix is architectural, not a better mirror:
+**principal recovery must depend on nothing but `Voter.reset` + escrow `withdraw`**.
+The final rebase is claimable via `claimRebase` all grace week; unclaimed remainder is
+forfeited — bounded and disclosed. TranchePilot has no unwind (permanent stakes), but
+the principle — never let a recoverable-value call sit on the principal-recovery path —
+carries over directly.
 
 ## Finding 5 — test-harness self-sufficiency
 
@@ -73,3 +85,51 @@ This environment could not fetch forge-std (network egress policy), so
 `test/utils/TestBase.sol` hand-declares the cheatcode interface and assertions.
 This is philosophically consistent with the project (zero dependencies) and keeps
 the whole repo building from a clean clone with nothing but `forge`.
+
+## Finding 6 — share pricing must use net assets, not just principal
+
+Found in review: post-activation deposits were priced against locked principal only.
+Claimed-but-uncompounded AERO (`looseAero`) is part of net asset value, so a depositor
+sliding in between `claimRevenue` and `compound` bought shares below NAV and captured
+revenue earned before them (three independent review angles converged on this). The
+mint denominator is now `locked + looseAero`. For TranchePilot: the §3.2 mint formula
+must be stated in terms of **net assets**, not "principal".
+
+## Finding 7 — a deposit cap is not a TVL cap
+
+`DEPOSIT_CAP` enforced against live locked principal meant vault growth (rebases,
+compounding, third-party `depositFor`) consumed cap room and could permanently close
+the vault to depositors; conversely the "blast-radius" reading was never enforceable
+anyway because third parties can grow the position directly. The cap now bounds
+cumulative `deposit()` inflow (`totalDeposited`, monotone up, refunds excluded), and
+the docs say exactly that. The derive-don't-track rule (Finding 3) applies to values
+third parties can move — a deposits-only counter is not one of them.
+
+## Finding 8 — the activation gate must bind the share supply, not the balance
+
+`activate()` gating on `AERO.balanceOf` let donations satisfy the threshold with a
+near-zero share supply, silently voiding the `totalShares ≥ ACTIVATION_MIN` premise
+that proves the distributor's uint192 narrowing safe. The gate now reads `totalShares`
+(1:1 with net deposits during seeding). Donations still get locked — they just cannot
+substitute for committed depositors. Rule for TranchePilot: **every arithmetic-safety
+proof premise must be enforced by the exact variable the proof quantifies over.**
+
+## Finding 9 — credit coalescing bounds an immutable contract's history growth
+
+`claimRevenue` is permissionless and bounty-incentivized, so credit-event history
+growth was attacker/caller-paced — an unbounded append-only array in a contract with
+no compaction path. The sequence counter now advances on share-balance changes rather
+than credits; credits between two balance changes share a seq and coalesce into one
+entry (identical applicable balances make the merge exact). History growth is bounded
+by transfer interleavings. Claims walk credits and checkpoints with a two-pointer
+merge, O(events + checkpoints), shared by `claimUser` and `pendingUser` so the view
+can never diverge from the payout.
+
+## Finding 10 — enforce properties on artifacts, not vocabulary
+
+The banned-constructs gate greps source identifiers, which filters an honest author's
+vocabulary, not the property (`only[A-Z]` bans a naming convention; a differently-named
+privileged check would pass). The gate now also disassembles the compiled runtime
+(metadata-stripped) and fails on any DELEGATECALL / SELFDESTRUCT / CALLCODE opcode,
+and the no-privilege property is exercised behaviorally by the fork suite's
+fresh-EOA probe. Greps remain as a lint layer only.

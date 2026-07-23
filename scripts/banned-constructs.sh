@@ -46,6 +46,33 @@ while IFS= read -r line; do
   esac
 done < <(grep -rhE --include='*.sol' '^\s*import\b' src/)
 
+# ── opcode-level pass ─────────────────────────────────────────────────────
+# Identifier greps filter vocabulary; the properties themselves are enforced
+# on the compiled artifact: no DELEGATECALL / SELFDESTRUCT / CALLCODE opcode
+# may appear in reachable runtime code (a rename cannot evade an opcode).
+# The CBOR metadata tail is stripped first so its arbitrary bytes cannot
+# false-positive as opcodes.
+if command -v cast >/dev/null 2>&1 && [ -f out/EpochPilot.sol/EpochPilot.json ]; then
+  RUNTIME=$(python3 - <<'PYEOF'
+import json
+code = json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object']
+h = code[2:] if code.startswith('0x') else code
+cbor_len = int(h[-4:], 16)          # last 2 bytes = metadata length
+h = h[: len(h) - (cbor_len + 2) * 2]  # strip metadata + the length bytes
+print('0x' + h)
+PYEOF
+)
+  BADOPS=$(cast disassemble "$RUNTIME" 2>/dev/null | grep -cE '\b(DELEGATECALL|SELFDESTRUCT|CALLCODE)\b' || true)
+  if [ "${BADOPS:-0}" -ne 0 ]; then
+    echo "BANNED OPCODE in runtime bytecode (DELEGATECALL/SELFDESTRUCT/CALLCODE): $BADOPS occurrence(s)" >&2
+    fail=1
+  else
+    echo "opcode scan: clean (no DELEGATECALL/SELFDESTRUCT/CALLCODE)"
+  fi
+else
+  echo "opcode scan: skipped (need cast + a forge build); source greps only" >&2
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "banned-constructs: FAIL" >&2
   exit 1

@@ -8,7 +8,6 @@ pragma solidity 0.8.30;
 ///      behaviors are asserted in the fork suite.
 interface IRewardsDistributor {
     function ve() external view returns (address);
-    function minter() external view returns (address);
     function claim(uint256 tokenId) external returns (uint256);
     function claimable(uint256 tokenId) external view returns (uint256);
 }
