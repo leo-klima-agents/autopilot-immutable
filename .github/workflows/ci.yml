@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # nightly: re-prove reproducibility and (when secrets allow) re-assert
+    # the live-protocol facts and the deployed-bytecode diff
+    - cron: "17 4 * * *"
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  banned-constructs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/banned-constructs.sh
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Build (pinned toolchain)
+        run: forge build --sizes
+      - name: Unit + fuzz + invariant tests (no network)
+        run: forge test --no-match-path 'test/fork/*' -vv
+
+  fork-tests:
+    # asserts every load-bearing protocol fact (G9/G10) against live Base
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Fork suite
+        env:
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+        run: |
+          if [ -z "$BASE_RPC_URL" ]; then
+            echo "BASE_RPC_URL secret not configured — skipping fork suite"
+            exit 0
+          fi
+          forge test --match-path 'test/fork/*' -vv
+
+  reproducible-build:
+    # §8: a clean clone must produce byte-identical bytecode
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Build twice from clean state, compare runtime bytecode
+        run: |
+          forge build
+          H1=$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])" | sha256sum)
+          forge clean && forge build
+          H2=$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])" | sha256sum)
+          [ "$H1" = "$H2" ] && echo "reproducible: $H1" || { echo "NON-REPRODUCIBLE BUILD"; exit 1; }
+      - name: Diff against recorded release hash
+        run: |
+          RECORDED=0x47f9f1036eb0767300f49be1ff2986c0b3fa313eca9161793fcbb98124b223ac
+          BUILT=$(cast keccak "$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])")")
+          if [ "$BUILT" != "$RECORDED" ]; then
+            echo "runtime bytecode hash drifted from verification/README.md: $BUILT"
+            echo "(update the record only as part of an intentional, re-audited release)"
+            exit 1
+          fi
