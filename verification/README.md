@@ -15,14 +15,11 @@
 
 ## Deterministic deployment (EpochPilot, series 1)
 
-| Item | Value |
-|---|---|
-| CREATE2 factory | `0x4e59b44847b379578588920cA78FbF26c0B4956C` (canonical deterministic-deployment proxy) |
-| salt | `keccak256("tranche-pilot/EpochPilot/series-1")` = `0x2f4ab442c035d1a9c8b5950925f27d098fe4ed5b40ce69733f5c794ee2d39481` |
-| constructor arg | Voter, resolved on-chain at deploy time (see `addresses.md`); `0x16613524e02ad97eDfeF371bC883F2F5d6C480A5` at the recorded block |
-| init code hash | `0x13cb4d11883d4f9434d146d9b749f7ba021bdc192a24c2f8db0d1909df83bf1b` |
-| **derived address** | `0x8C4092697c08EE852CEff35a95920CE19CCc73af` |
-| runtime bytecode keccak256 | `0xe18d75bce8767a926911b1d921c370c4f518ea6afc05948ba6891adb6353f241` |
+The authoritative values — CREATE2 factory, salt, constructor arg (Voter),
+init-code hash, derived address, and runtime-bytecode keccak256 — live in
+[`bytecode-hashes.json`](bytecode-hashes.json), the single machine-readable
+source of truth. The `release-hash` CI job re-derives all of them from a clean
+build and fails on any drift, so they are never hand-maintained here.
 
 Re-derive the address yourself:
 
@@ -41,7 +38,7 @@ version pin):
 ```
 forge build
 cast keccak "$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])")"
-# → must equal the runtime bytecode hash above
+# → must equal .runtimeBytecodeKeccak256 in bytecode-hashes.json
 ```
 
 Against the deployed contract (post-deployment): a raw `cast code` diff would
@@ -49,8 +46,9 @@ show mismatches at the contract's five immutable-reference sites (the compiler
 artifact carries zeroed placeholders that CREATE2 fills at construction), so
 byte-equality is proven a different way — **the address itself is the proof**.
 CREATE2 addresses commit to the full init code: if the contract exists at the
-derived address above, the deployed creation bytecode (and therefore the source,
-compiler and settings) matched this repository exactly. Check both directions:
+recorded `deployment.derivedAddress`, the deployed creation bytecode (and
+therefore the source, compiler and settings) matched this repository exactly.
+Check both directions:
 
 ```
 # 1. the deployed address matches the derivation from the local build
