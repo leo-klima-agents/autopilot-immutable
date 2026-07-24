@@ -1,0 +1,23 @@
+{
+  "contract": "EpochPilot",
+  "series": "series-1",
+  "chainId": 8453,
+  "toolchain": {
+    "solc": "0.8.30+commit.73712a01",
+    "optimizer": true,
+    "optimizerRuns": 200,
+    "viaIR": false,
+    "evmVersion": "cancun",
+    "bytecodeHash": "ipfs"
+  },
+  "deployment": {
+    "create2Factory": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "salt": "0x2f4ab442c035d1a9c8b5950925f27d098fe4ed5b40ce69733f5c794ee2d39481",
+    "constructorArgs": {
+      "voter": "0x16613524e02ad97eDfeF371bC883F2F5d6C480A5"
+    },
+    "initCodeHash": "0x13cb4d11883d4f9434d146d9b749f7ba021bdc192a24c2f8db0d1909df83bf1b",
+    "derivedAddress": "0x8C4092697c08EE852CEff35a95920CE19CCc73af"
+  },
+  "runtimeBytecodeKeccak256": "0xe18d75bce8767a926911b1d921c370c4f518ea6afc05948ba6891adb6353f241"
+}

@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # nightly: re-prove reproducibility against the recorded release hash and
+    # re-assert the live-protocol facts
+    - cron: "17 4 * * *"
+
+# a push to an open PR must not run the pipeline twice
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  banned-constructs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: forge build
+      - run: ./scripts/banned-constructs.sh
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Build (pinned toolchain)
+        run: forge build --sizes
+      - name: Unit + fuzz + invariant tests (no network)
+        run: forge test --no-match-path 'test/fork/*' -vv
+
+  fork-tests:
+    # asserts every load-bearing protocol fact (G9/G10) against live Base.
+    # On the nightly schedule a missing RPC secret is a hard failure — the
+    # drift-detection job must never be able to go silently green.
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Fork suite
+        env:
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+        run: |
+          if [ -z "$BASE_RPC_URL" ]; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "BASE_RPC_URL secret is not configured — the nightly protocol-drift check cannot run" >&2
+              exit 1
+            fi
+            echo "BASE_RPC_URL secret not configured — skipping fork suite on this event"
+            exit 0
+          fi
+          forge test --match-path 'test/fork/*' -vv
+
+  reproducible-build:
+    # §8: a clean clone must produce byte-identical bytecode (every run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Build twice from clean state, compare runtime bytecode
+        run: |
+          forge build
+          H1=$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])" | sha256sum)
+          forge clean && forge build
+          H2=$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])" | sha256sum)
+          [ "$H1" = "$H2" ] && echo "reproducible: $H1" || { echo "NON-REPRODUCIBLE BUILD"; exit 1; }
+
+  release-hash:
+    # release-integrity gate: compares against the recorded hash in
+    # verification/README.md. Deliberately NOT run per-push — on every commit
+    # it would train reviewers to rubber-stamp hash bumps; it belongs where
+    # the record must hold: the nightly (deployed-artifact drift) and tags.
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Diff against recorded release hashes
+        run: |
+          forge build
+          REC_RUNTIME=$(python3 -c "import json;print(json.load(open('verification/bytecode-hashes.json'))['runtimeBytecodeKeccak256'])")
+          REC_INIT=$(python3 -c "import json;print(json.load(open('verification/bytecode-hashes.json'))['deployment']['initCodeHash'])")
+          REC_ADDR=$(python3 -c "import json;print(json.load(open('verification/bytecode-hashes.json'))['deployment']['derivedAddress'])")
+          REC_SALT=$(python3 -c "import json;print(json.load(open('verification/bytecode-hashes.json'))['deployment']['salt'])")
+          REC_FACTORY=$(python3 -c "import json;print(json.load(open('verification/bytecode-hashes.json'))['deployment']['create2Factory'])")
+          REC_VOTER=$(python3 -c "import json;print(json.load(open('verification/bytecode-hashes.json'))['deployment']['constructorArgs']['voter'])")
+
+          BUILT_RUNTIME=$(cast keccak "$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['deployedBytecode']['object'])")")
+          CREATION=$(python3 -c "import json;print(json.load(open('out/EpochPilot.sol/EpochPilot.json'))['bytecode']['object'])")
+          BUILT_INIT=$(cast keccak "${CREATION}$(cast abi-encode 'constructor(address)' "$REC_VOTER" | cut -c3-)")
+          BUILT_ADDR=$(cast create2 --deployer "$REC_FACTORY" --salt "$REC_SALT" --init-code-hash "$BUILT_INIT")
+
+          fail=0
+          [ "$BUILT_RUNTIME" = "$REC_RUNTIME" ] || { echo "runtime bytecode hash drift: built $BUILT_RUNTIME vs recorded $REC_RUNTIME"; fail=1; }
+          [ "$BUILT_INIT" = "$REC_INIT" ] || { echo "init code hash drift: built $BUILT_INIT vs recorded $REC_INIT"; fail=1; }
+          [ "$BUILT_ADDR" = "$REC_ADDR" ] || { echo "derived address drift: built $BUILT_ADDR vs recorded $REC_ADDR"; fail=1; }
+          if [ "$fail" -ne 0 ]; then
+            echo "verification/bytecode-hashes.json drifted from a clean build"
+            echo "(update the record only as part of an intentional, re-audited release)"
+            exit 1
+          fi
+          echo "release hashes match: runtime=$BUILT_RUNTIME addr=$BUILT_ADDR"

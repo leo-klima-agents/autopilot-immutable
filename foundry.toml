@@ -1,0 +1,32 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = []
+test = "test"
+script = "script"
+
+# ── Reproducibility pins (§8) ────────────────────────────────────────────────
+# Exact solc patch, fixed optimizer, fixed EVM target, ipfs metadata hash.
+# A clean clone must produce byte-identical bytecode: `forge build` and compare
+# against verification/bytecode-hashes.json.
+solc = "0.8.30"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+evm_version = "cancun"
+bytecode_hash = "ipfs"
+cbor_metadata = true
+
+# No external dependencies, ever (§5.1). Empty remappings keep it that way.
+remappings = []
+
+ffi = false
+fuzz = { runs = 512 }
+invariant = { runs = 64, depth = 64, fail_on_revert = false }
+
+[profile.ci]
+fuzz = { runs = 4096 }
+invariant = { runs = 256, depth = 128 }
+
+[rpc_endpoints]
+base = "${BASE_RPC_URL}"
