@@ -3,6 +3,10 @@
 Findings made during EpochPilot implementation that feed back into the
 TranchePilot (v3) spec freeze. Numbered so `docs/g-facts.md` can reference them.
 
+The brief these amend is preserved verbatim in [`BRIEF.md`](BRIEF.md); the
+consolidated, up-to-date spec with each finding folded in at the section it
+touches is [`BRIEF-amended.md`](BRIEF-amended.md).
+
 ## Finding 1 — brief §3.5's reward-debt accounting is unsound as written
 
 The brief specifies: *"Per-token Synthetix-style accumulator … users pull with standard
