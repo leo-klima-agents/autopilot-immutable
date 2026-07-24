@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.36;
 
 /// @dev Self-contained minimal test harness over Foundry's raw cheatcode
 ///      interface. Written in-repo because this environment cannot fetch

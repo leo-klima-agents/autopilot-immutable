@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.36;
 
 /// @dev Minimal mock of the Aerodrome v2 surface EpochPilot touches, faithful
 ///      to the gates asserted in the fork suite: epoch arithmetic, one vote

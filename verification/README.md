@@ -6,7 +6,7 @@
 
 | Item | Value |
 |---|---|
-| solc | `0.8.30+commit.73712a01` (exact patch pinned in `foundry.toml`) |
+| solc | `0.8.36+commit.8a079791` (exact patch pinned in `foundry.toml`) |
 | optimizer | enabled, `runs = 200` |
 | via_ir | `false` |
 | evm_version | `cancun` |

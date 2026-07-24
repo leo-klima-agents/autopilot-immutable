@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.36;
 
 /// @notice Minimal ERC-20 surface used by EpochPilot.
 /// @dev Hand-written per the no-external-dependencies rule (§5.1). Reward

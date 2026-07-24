@@ -84,7 +84,7 @@ audits/                   static-analysis triage; external audit reports land he
 ## Build & test
 
 ```
-forge build                                   # pinned solc 0.8.30, no dependencies
+forge build                                   # pinned solc 0.8.36, no dependencies
 forge test --no-match-path 'test/fork/*'      # unit + fuzz + invariants (no network)
 BASE_RPC_URL=... forge test --match-path 'test/fork/*'   # live-protocol assertions
 ./scripts/banned-constructs.sh                # §5.1 gate

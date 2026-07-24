@@ -3,7 +3,7 @@
   "series": "series-1",
   "chainId": 8453,
   "toolchain": {
-    "solc": "0.8.30+commit.73712a01",
+    "solc": "0.8.36+commit.8a079791",
     "optimizer": true,
     "optimizerRuns": 200,
     "viaIR": false,
@@ -16,8 +16,8 @@
     "constructorArgs": {
       "voter": "0x16613524e02ad97eDfeF371bC883F2F5d6C480A5"
     },
-    "initCodeHash": "0x13cb4d11883d4f9434d146d9b749f7ba021bdc192a24c2f8db0d1909df83bf1b",
-    "derivedAddress": "0x8C4092697c08EE852CEff35a95920CE19CCc73af"
+    "initCodeHash": "0x374ee3dea1c4e42ad1a65dba9e199a2c769c218b33ad9c4cf278e26e75ebb06b",
+    "derivedAddress": "0xa73F87341bafe934a43Fc8d6c42058b7d25e8612"
   },
-  "runtimeBytecodeKeccak256": "0xe18d75bce8767a926911b1d921c370c4f518ea6afc05948ba6891adb6353f241"
+  "runtimeBytecodeKeccak256": "0xb48ef743a85df96f0ef42621615b98fd921bc3623b6892168b324289c1120a5e"
 }
