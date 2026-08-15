@@ -1,6 +1,6 @@
 # Slither triage — EpochPilot (brief §7.6)
 
-- Slither `0.11.5`, solc `0.8.30`, run: `slither . --filter-paths "test/|script/" --exclude-informational`
+- Slither `0.11.5`, solc `0.8.36`, run: `slither . --filter-paths "test/|script/" --exclude-informational`
 - Scope: `src/` only. Result: **39 findings, 0 accepted as bugs** — every one triaged below.
   Re-run on every source change; a new detector hit that is not in this table blocks merge.
 

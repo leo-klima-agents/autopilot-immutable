@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.36;
 
 import {EpochPilot} from "../src/EpochPilot.sol";
 import {IVoter} from "../src/interfaces/IVoter.sol";

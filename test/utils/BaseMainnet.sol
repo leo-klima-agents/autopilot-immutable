@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.36;
 
 /// @dev Single source of truth for the fork suites' chain fixture: the AERO
 ///      root-of-trust address (identity asserted on-chain by every consumer)
