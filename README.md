@@ -17,7 +17,7 @@ Two deliverables (build brief §0):
 | Contract | Protocol | Status |
 |---|---|---|
 | `src/EpochPilot.sol` | Aerodrome v2 (live on Base) | implemented — proof-of-concept demonstrating the machinery: pooled custody, permissionless bountied operations, immutability, reproducible verification. Capped at 10,000 AERO. |
-| `src/TranchePilot.sol` | Aero v3 | **not yet started — deliberately.** The spec-freeze gate (brief §2) forbids implementation until facts G1/G3/G4/G6/G7 are confirmed in the code Aero publishes from **Aug 3, 2026**. Progress lives in `docs/g-facts.md`. |
+| `src/TranchePilot.sol` | Aero v3 | **not yet started; gate open.** The spec-freeze gate (brief §2) lifted 2026-08-31: G1/G3/G4/G6/G7 verified in the published v3 code ([dromos-labs/metadex-public](https://github.com/dromos-labs/metadex-public) @ `0d75da99`). The full diff — including the G7 shape divergence (absolute budgets, not relative weights) and the no-rebase finding — lives in `docs/g-facts.md`. Re-verification against deployed contracts still required before any deployment. |
 
 ## What EpochPilot does
 
