@@ -1,0 +1,212 @@
+{
+ "fork_block": 53388239,
+ "rows": [
+  {
+   "step": "0",
+   "label": "LIVE READ",
+   "actor": "-",
+   "action": "provenance + state",
+   "result": "registry factories [0xA972232e6C1860586E1d66aC690d30Dab843049d, 0xA5283582951ae0cF72bE4BEA54dA63D199264B78]; relay 0xf588F86577C472D83E5F84403951AA0B92fc1Dd6 is a factory-2 MaxiRelay clone of 0x3909f8b833A8Beba57CEf8c6E713E885b6c359cE; config (20365 [2.036e4], 1000000000000000000 [1e18], 176400 [1.764e5], 3600, 0, 604800 [6.048e5], \"Autopilot sAERO Maxi\", \"sAERO-Maxi\"); deposit queue (head,tail,count)=['824', '909', '86']; #17968 4,160,871.205527 AERO, chain0 0.000000; VPM registration(relay, withdrawToNFT)=['true', '0']",
+   "gasUsed": null,
+   "t_plus_s": 0
+  },
+  {
+   "step": "1",
+   "label": "SIMULATED (eth_call)",
+   "actor": "Safe",
+   "action": "VPM.withdrawToNFT(17968 -> 10 fresh sAERO) called directly by the holder",
+   "result": "reverts NotRegistered()",
+   "gasUsed": null,
+   "t_plus_s": 0
+  },
+  {
+   "step": "2.1",
+   "label": "SIMULATED",
+   "actor": "Safe",
+   "action": "approve VPM (operator) + relay (token)",
+   "result": "ok",
+   "gasUsed": 95029,
+   "t_plus_s": 4
+  },
+  {
+   "step": "2.2",
+   "label": "SIMULATED",
+   "actor": "Safe",
+   "action": "Voter.allocateGauges(17968, Base, [DEALLOC_GAUGE: all])",
+   "result": "chain0 = 4,160,871.205527",
+   "gasUsed": 2689356,
+   "t_plus_s": 6
+  },
+  {
+   "step": "2.3",
+   "label": "SIMULATED (eth_call)",
+   "actor": "Safe",
+   "action": "requestDeposit(17968, explicit amount)",
+   "result": "reverts NotFullStake()",
+   "gasUsed": null,
+   "t_plus_s": 6
+  },
+  {
+   "step": "2.4",
+   "label": "SIMULATED (eth_call)",
+   "actor": "Safe",
+   "action": "requestDeposit(17968, 1/10 of stake)",
+   "result": "reverts NotFullStake()",
+   "gasUsed": null,
+   "t_plus_s": 6
+  },
+  {
+   "step": "2.5",
+   "label": "SIMULATED",
+   "actor": "Safe",
+   "action": "requestDeposit(17968, type(uint256).max)",
+   "result": "queued id 910, net 4,160,871.205527 (gross 4,160,871.205527); #17968 left 0 wei; queue now ['824', '910', '87']",
+   "gasUsed": 510977,
+   "t_plus_s": 8
+  },
+  {
+   "step": "3K",
+   "label": "SIMULATED",
+   "actor": "keeper",
+   "action": "processPending(87) (whole backlog incl. ours, FIFO)",
+   "result": "processed 87",
+   "gasUsed": 6129888,
+   "t_plus_s": 10
+  },
+  {
+   "step": "4K.0",
+   "label": "SIMULATED (state read)",
+   "actor": "-",
+   "action": "deposit record after processing",
+   "result": "deposits(910) = recipient 0xa79cd47655156b299762DFE92A67980805ce5a31, requestedAt 0, shares 4,160,871.205527; depositIdsOf(Safe)[0]=910",
+   "gasUsed": null,
+   "t_plus_s": 10
+  },
+  {
+   "step": "4.1",
+   "label": "SIMULATED (eth_call)",
+   "actor": "Safe",
+   "action": "registerOnWithdrawQueue(shares/10, fresh) \u2014 old-ABI style partial exit",
+   "result": "reverts DepositRecordNotFound()",
+   "gasUsed": null,
+   "t_plus_s": 10
+  },
+  {
+   "step": "4.2",
+   "label": "SIMULATED (eth_call)",
+   "actor": "stranger",
+   "action": "registerOnWithdrawQueue(910) by non-holder",
+   "result": "reverts NotDepositHolder()",
+   "gasUsed": null,
+   "t_plus_s": 10
+  },
+  {
+   "step": "4K.1",
+   "label": "SIMULATED",
+   "actor": "Safe",
+   "action": "registerOnWithdrawQueue(910, fresh sAERO)",
+   "result": "escrowed 4,160,871.205527 shares (the whole record)",
+   "gasUsed": 156872,
+   "t_plus_s": 12
+  },
+  {
+   "step": "4K.2",
+   "label": "SIMULATED (eth_call)",
+   "actor": "Safe",
+   "action": "registerOnWithdrawQueue(910) again, for a 2nd piece",
+   "result": "reverts DepositRecordNotFound()",
+   "gasUsed": null,
+   "t_plus_s": 12
+  },
+  {
+   "step": "4K.3",
+   "label": "SIMULATED",
+   "actor": "stranger",
+   "action": "processWithdrawals(1)",
+   "result": "Safe received 1 sAERO: #21269 4,160,871.205527 perm=True; shortfall vs net deposit 0 wei",
+   "gasUsed": 807007,
+   "t_plus_s": 14
+  },
+  {
+   "step": "3O",
+   "label": "SIMULATED",
+   "actor": "stranger",
+   "action": "processOverduePending([910]) at requestedAt+176400s",
+   "result": "processed our entry alone",
+   "gasUsed": 230307,
+   "t_plus_s": 176410
+  },
+  {
+   "step": "4O.0",
+   "label": "SIMULATED (state read)",
+   "actor": "-",
+   "action": "deposit record after processing",
+   "result": "deposits(910) = recipient 0xa79cd47655156b299762DFE92A67980805ce5a31, requestedAt 0, shares 4,160,871.205527; depositIdsOf(Safe)[0]=910",
+   "gasUsed": null,
+   "t_plus_s": 176410
+  },
+  {
+   "step": "4O.1",
+   "label": "SIMULATED",
+   "actor": "Safe",
+   "action": "registerOnWithdrawQueue(910, fresh sAERO)",
+   "result": "escrowed 4,160,871.205527 shares (the whole record)",
+   "gasUsed": 156872,
+   "t_plus_s": 176412
+  },
+  {
+   "step": "4O.2",
+   "label": "SIMULATED (eth_call)",
+   "actor": "Safe",
+   "action": "registerOnWithdrawQueue(910) again, for a 2nd piece",
+   "result": "reverts DepositRecordNotFound()",
+   "gasUsed": null,
+   "t_plus_s": 176412
+  },
+  {
+   "step": "4O.3",
+   "label": "SIMULATED",
+   "actor": "stranger",
+   "action": "processWithdrawals(1)",
+   "result": "Safe received 1 sAERO: #21269 4,160,871.205527 perm=True; shortfall vs net deposit 0 wei",
+   "gasUsed": 807007,
+   "t_plus_s": 176414
+  }
+ ],
+ "results": {
+  "keeper": {
+   "deposit_id": 910,
+   "net_in": 4160871205526882263707324,
+   "shares": 4160871205526882263707324,
+   "new_sAERO": [
+    {
+     "tokenId": 21269,
+     "net": 4160871205526882263707324,
+     "amount": 4160871205526882263707324,
+     "end": 0,
+     "isPermanent": true,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31"
+    }
+   ],
+   "second_exit_error": "DepositRecordNotFound()",
+   "shortfall_wei": 0
+  },
+  "overdue": {
+   "deposit_id": 910,
+   "net_in": 4160871205526882263707324,
+   "shares": 4160871205526882263707324,
+   "new_sAERO": [
+    {
+     "tokenId": 21269,
+     "net": 4160871205526882263707324,
+     "amount": 4160871205526882263707324,
+     "end": 0,
+     "isPermanent": true,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31"
+    }
+   ],
+   "second_exit_error": "DepositRecordNotFound()",
+   "shortfall_wei": 0
+  }
+ }
+}
