@@ -1,0 +1,897 @@
+{
+ "live": {
+  "fork_block": 53387600,
+  "fork_timestamp": 1793564547,
+  "relay": "0x871d4388589b3d0259089534C0711ea8B7F06E7B",
+  "relay_name": "Autopilot sAERO Maxi",
+  "relay_sAERO": 10028,
+  "minDeposit": 1000000000000000000,
+  "keeperWindow_s": 176400,
+  "minWithdrawal": 1000000000000000000,
+  "entrypointTimelock_s": 3600,
+  "lockWeeks": 0,
+  "evacuationWindow_s": 604800,
+  "rakes(protocol,allocator,pendingP,pendingA,executableAt)": "(0, 0, 0, 0, 0)",
+  "MAX_RAKE_PIPS": 200000,
+  "rewardTokens": "[]",
+  "owner_17968": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+  "staked_17968": {
+   "amount": 4160871205526882263707324,
+   "end": 0,
+   "isPermanent": true
+  },
+  "chain0_17968": 0,
+  "allocationChainIds_17968": "[8453]",
+  "leaf_cooldown_s": 169200,
+  "leaf_lastAllocated_17968": 1793016351,
+  "vpm_restricted_deposit": "true",
+  "vpm_restricted_withdraw": "true",
+  "vpm_relay_registered_deposit": [
+   "false",
+   "0"
+  ],
+  "vpm_relay_registered_withdraw": [
+   "false",
+   "0"
+  ],
+  "vpm_default_fee_deposit": [
+   "false",
+   "0"
+  ],
+  "vpm_default_fee_withdraw": [
+   "false",
+   "0"
+  ],
+  "deposit_queue(head,tail,count)": [
+   "1",
+   "3",
+   "3"
+  ],
+  "pending_deposits": [
+   [
+    "0xc0A6164860976f1859C519C03b31b9631919C04B",
+    "1792715877",
+    "11541",
+    "1000000000000000000"
+   ],
+   [
+    "0x892Ff98a46e5bd141E2D12618f4B2Fe6284debac",
+    "1792716165",
+    "11551",
+    "1000000000000000000"
+   ],
+   [
+    "0x0e8E965A7774367a4F5383Ae7e0750d14e476a22",
+    "1792716805",
+    "11574",
+    "1000000000000000000"
+   ]
+  ],
+  "keeper": "0x7793f0a7dc211045532e53c9c02a8b2c2a1cfe67",
+  "fee_manager": "0x42255e3C2d0b71a0b006243148fdF1a71d054cE0"
+ },
+ "rows": [
+  {
+   "step": "0",
+   "actor": "-",
+   "action": "live state at fork block",
+   "result": "#17968 owner 0xa79cd47655156b299762DFE92A67980805ce5a31, staked 4,160,871.205527 AERO, permanent=True, chain0(free)=0.000000",
+   "gasUsed": null,
+   "t_plus_s": 0,
+   "label": "LIVE READ"
+  },
+  {
+   "step": "2.1",
+   "actor": "Safe (impersonated)",
+   "action": "VE.setApprovalForAll(VPM, true)",
+   "result": "ok",
+   "gasUsed": 46323,
+   "t_plus_s": 2,
+   "label": "SIMULATED"
+  },
+  {
+   "step": "2.2",
+   "actor": "Safe (impersonated)",
+   "action": "VE.approve(relay, 17968)",
+   "result": "ok",
+   "gasUsed": 48706,
+   "t_plus_s": 4,
+   "label": "SIMULATED"
+  },
+  {
+   "step": "2.3",
+   "actor": "Safe",
+   "action": "requestDeposit(17968, all) \u2014 live config, weight still allocated",
+   "result": "reverts NotRegistered()",
+   "gasUsed": null,
+   "t_plus_s": 4,
+   "label": "SIMULATED (eth_call)",
+   "expected": "NotRegistered",
+   "matched": true
+  },
+  {
+   "step": "2.4",
+   "actor": "Safe",
+   "action": "requestDeposit(17968, all) with VPM re-registered but source not deallocated (source free weight too low) [COUNTERFACTUAL VPM]",
+   "result": "reverts InsufficientChain0Allocation()",
+   "gasUsed": null,
+   "t_plus_s": 6,
+   "label": "SIMULATED (eth_call)",
+   "expected": "InsufficientChain0Allocation",
+   "matched": true
+  },
+  {
+   "step": "2.5",
+   "actor": "Safe",
+   "action": "Voter.allocateGauges(17968, Base, [DEALLOC_GAUGE: all]) \u2014 pull weight back to chain0",
+   "result": "chain0(17968) = 4,160,871.205527 (allocating=false)",
+   "gasUsed": 2732034,
+   "t_plus_s": 6,
+   "label": "SIMULATED"
+  },
+  {
+   "step": "2.6",
+   "actor": "Safe",
+   "action": "requestDeposit(17968, all) after dealloc \u2014 live VPM config",
+   "result": "reverts NotRegistered()",
+   "gasUsed": null,
+   "t_plus_s": 6,
+   "label": "SIMULATED (eth_call)",
+   "expected": "NotRegistered",
+   "matched": true
+  },
+  {
+   "step": "2.7",
+   "actor": "VPM FEE_MANAGER 0x42255e3C2d0b71a0b006243148fdF1a71d054cE0 (impersonated)",
+   "action": "VPM.setFee(depositIntoNFT|withdrawToNFT, relay, 0) \u2014 restores the registration that existed blocks 52,963,120-52,966,196",
+   "result": "ok",
+   "gasUsed": 99100,
+   "t_plus_s": 10,
+   "label": "COUNTERFACTUAL"
+  },
+  {
+   "step": "2.8",
+   "actor": "Safe",
+   "action": "requestDeposit(17968, minDeposit-1 = 999999999999999999 wei)",
+   "result": "reverts BelowMinimumDeposit()",
+   "gasUsed": null,
+   "t_plus_s": 10,
+   "label": "SIMULATED (eth_call)",
+   "expected": "BelowMinimumDeposit",
+   "matched": true
+  },
+  {
+   "step": "2.9",
+   "actor": "stranger",
+   "action": "requestDeposit(17968) by a non-owner",
+   "result": "reverts NotAuthorized()",
+   "gasUsed": null,
+   "t_plus_s": 10,
+   "label": "SIMULATED (eth_call)",
+   "expected": "NotAuthorized",
+   "matched": true
+  },
+  {
+   "step": "2.10",
+   "actor": "Safe",
+   "action": "relay.requestDeposit(17968, 4,160,871.205527)",
+   "result": "queued id 4; net weight in relay 4,160,871.205527; VPM fee 0 wei; #17968 left with 0 wei",
+   "gasUsed": 440572,
+   "t_plus_s": 12,
+   "label": "SIMULATED",
+   "deposit_id": 4,
+   "net_in": 4160871205526882263707324
+  },
+  {
+   "step": "3O.1",
+   "actor": "stranger",
+   "action": "processOverduePending([4]) immediately",
+   "result": "reverts KeeperWindowNotElapsed()",
+   "gasUsed": null,
+   "t_plus_s": 12,
+   "label": "SIMULATED (eth_call)",
+   "expected": "KeeperWindowNotElapsed",
+   "matched": true
+  },
+  {
+   "step": "3O.2",
+   "actor": "stranger",
+   "action": "processOverduePending([4]) mined at requestedAt+176399s",
+   "result": "reverted (status 0)",
+   "gasUsed": 55394,
+   "t_plus_s": 176411,
+   "label": "SIMULATED"
+  },
+  {
+   "step": "3O.3",
+   "actor": "stranger (permissionless)",
+   "action": "relay.processOverduePending([4]) mined at requestedAt+176400s (= keeperWindow exactly)",
+   "result": "processed 1 entry out of order (3 older entries still queued); Safe minted 4,160,871.205527 PT+YT",
+   "gasUsed": 235992,
+   "t_plus_s": 176412,
+   "label": "SIMULATED",
+   "shares": 4160871205526882263707324
+  },
+  {
+   "step": "3O.4",
+   "actor": "stranger",
+   "action": "processOverduePending same id again",
+   "result": "reverts DepositAlreadyProcessed()",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)",
+   "expected": "DepositAlreadyProcessed",
+   "matched": true
+  },
+  {
+   "step": "4.1",
+   "actor": "Safe",
+   "action": "exit piece = 0 shares",
+   "result": "reverts BelowMinimumWithdrawal()",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)",
+   "expected": "BelowMinimumWithdrawal",
+   "matched": true
+  },
+  {
+   "step": "4.2",
+   "actor": "Safe",
+   "action": "exit piece = minWithdrawal-1 (999999999999999999 wei shares)",
+   "result": "reverts BelowMinimumWithdrawal()",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)",
+   "expected": "BelowMinimumWithdrawal",
+   "matched": true
+  },
+  {
+   "step": "4.3",
+   "actor": "Safe",
+   "action": "exit leaving remainder of minWithdrawal-1",
+   "result": "reverts BelowMinimumWithdrawal()",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)",
+   "expected": "BelowMinimumWithdrawal",
+   "matched": true
+  },
+  {
+   "step": "4.4",
+   "actor": "Safe",
+   "action": "exit piece = exactly minWithdrawal (1000000000000000000 wei shares)",
+   "result": "accepted",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)"
+  },
+  {
+   "step": "4.5",
+   "actor": "Safe",
+   "action": "exit piece = free+1",
+   "result": "reverts InsufficientFreeShares()",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)",
+   "expected": "InsufficientFreeShares",
+   "matched": true
+  },
+  {
+   "step": "4.6",
+   "actor": "Safe",
+   "action": "destination = relay's own sAERO",
+   "result": "reverts InvalidDestination()",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)",
+   "expected": "InvalidDestination",
+   "matched": true
+  },
+  {
+   "step": "4.7",
+   "actor": "stranger",
+   "action": "exit by an address holding no shares",
+   "result": "reverts InsufficientFreeShares()",
+   "gasUsed": null,
+   "t_plus_s": 176412,
+   "label": "SIMULATED (eth_call)",
+   "expected": "InsufficientFreeShares",
+   "matched": true
+  },
+  {
+   "step": "4.8",
+   "actor": "keeper as VOTER_ROLE",
+   "action": "relay.allocate(Base, 3,952,831.645251 over 6 gauges)",
+   "result": "relay free chain0 now 208,043.560276 (< one piece 416,087.120553)",
+   "gasUsed": 3377330,
+   "t_plus_s": 176414,
+   "label": "SIMULATED (scenario)"
+  },
+  {
+   "step": "4.9",
+   "actor": "stranger",
+   "action": "processWithdrawals(10) with free weight < head exit",
+   "result": "does NOT revert; settled 0; queue ['1', '10', '10'] -> ['1', '10', '10']",
+   "gasUsed": 63235,
+   "t_plus_s": 176436,
+   "label": "SIMULATED (scenario)"
+  },
+  {
+   "step": "4.10",
+   "actor": "keeper as VOTER_ROLE",
+   "action": "relay.allocate(+1 wei) while exits are queued",
+   "result": "reverts InsufficientFreeWeight()",
+   "gasUsed": null,
+   "t_plus_s": 176436,
+   "label": "SIMULATED (eth_call)",
+   "expected": "InsufficientFreeWeight",
+   "matched": true
+  },
+  {
+   "step": "4.11",
+   "actor": "keeper as VOTER_ROLE",
+   "action": "relay.allocate(DEALLOC all) right after allocating (leaf cooldown)",
+   "result": "reverts CooldownActive()",
+   "gasUsed": null,
+   "t_plus_s": 176436,
+   "label": "SIMULATED (eth_call)",
+   "expected": "CooldownActive",
+   "matched": true
+  },
+  {
+   "step": "4.12",
+   "actor": "stranger",
+   "action": "close() by anyone before evacuationWindow",
+   "result": "reverts EvacuationWindowNotElapsed()",
+   "gasUsed": null,
+   "t_plus_s": 176436,
+   "label": "SIMULATED (eth_call)",
+   "expected": "EvacuationWindowNotElapsed",
+   "matched": true
+  },
+  {
+   "step": "4.13",
+   "actor": "stranger",
+   "action": "close() after evacuationWindow=604800s with head still uncovered (eth_call)",
+   "result": "callable by anyone",
+   "gasUsed": null,
+   "t_plus_s": 781236,
+   "label": "SIMULATED (eth_call, scenario)"
+  },
+  {
+   "step": "4.14",
+   "actor": "keeper, then stranger",
+   "action": "after leaf cooldown 169200s: dealloc, then processWithdrawals(10)",
+   "result": "settled 10 exits",
+   "gasUsed": 8684384,
+   "t_plus_s": 345640,
+   "label": "SIMULATED (scenario)"
+  },
+  {
+   "step": "4O.r",
+   "actor": "Safe",
+   "action": "registerOnWithdrawQueue(piece, MINT_SENTINEL) x10",
+   "result": "10 exits queued; escrowed 4,160,871.205527 shares; pieces 416,087.120553 x9 + 416,087.120553",
+   "gasUsed": 1248478,
+   "t_plus_s": 176432,
+   "label": "SIMULATED",
+   "per_call": [
+    171021,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119585
+   ]
+  },
+  {
+   "step": "4O.d",
+   "actor": "stranger (permissionless)",
+   "action": "relay.processWithdrawals(10)",
+   "result": "settled 10 exits in one call",
+   "gasUsed": 4839111,
+   "t_plus_s": 176434,
+   "label": "SIMULATED"
+  },
+  {
+   "step": "5O.sum",
+   "actor": "-",
+   "action": "sum of 10 new sAERO vs deposit",
+   "result": "sum 4,160,871.205527 vs net deposit 4,160,871.205527: shortfall 0 wei (VPM deposit fee 0 wei, VPM withdraw fee 0 wei)",
+   "gasUsed": null,
+   "t_plus_s": 176434,
+   "label": "SIMULATED (state read)"
+  },
+  {
+   "step": "5O.perm",
+   "actor": "-",
+   "action": "each new sAERO permanent / owner / free",
+   "result": "permanent(end=0)=True owner=Safe:True free-on-chain0:True ids=[21265, 21266, 21267, 21268, 21269, 21270, 21271, 21272, 21273, 21274]",
+   "gasUsed": null,
+   "t_plus_s": 176434,
+   "label": "SIMULATED (state read)"
+  },
+  {
+   "step": "5O.q",
+   "actor": "-",
+   "action": "queue drained",
+   "result": "withdrawQueue=['0', '10', '0'] pendingShares=0 escrow=0 PT=0 YT=0",
+   "gasUsed": null,
+   "t_plus_s": 176434,
+   "label": "SIMULATED (state read)"
+  },
+  {
+   "step": "5.perm2",
+   "actor": "Safe",
+   "action": "VE.downgradeFromPermanentStake(21265) (eth_call)",
+   "result": "callable by holder (permanence is a flag, not irrevocable)",
+   "gasUsed": null,
+   "t_plus_s": 176434,
+   "label": "SIMULATED (eth_call)"
+  },
+  {
+   "step": "5.alloc",
+   "actor": "Safe",
+   "action": "Voter.allocate(21265 -> one Base gauge, full amount) right after mint (eth_call)",
+   "result": "accepted; leaf lastAllocated=0, root tokenStates(committed,lastStakeEnd,lastAllocated,isPermanent)=['416087120552688226370732', '0', '0', 'true']",
+   "gasUsed": null,
+   "t_plus_s": 176434,
+   "label": "SIMULATED (eth_call)"
+  },
+  {
+   "step": "5.q2",
+   "actor": "Safe",
+   "action": "register another exit after full exit",
+   "result": "reverts InsufficientFreeShares()",
+   "gasUsed": null,
+   "t_plus_s": 176434,
+   "label": "SIMULATED (eth_call)"
+  },
+  {
+   "step": "3K.1",
+   "actor": "stranger",
+   "action": "processPending(10) by non-keeper",
+   "result": "reverts Unauthorized()",
+   "gasUsed": null,
+   "t_plus_s": 12,
+   "label": "SIMULATED (eth_call)",
+   "expected": "Unauthorized",
+   "matched": true
+  },
+  {
+   "step": "3K.2",
+   "actor": "keeper 0x7793f0a7dc211045532e53c9c02a8b2c2a1cfe67 (impersonated)",
+   "action": "relay.processPending(10)",
+   "result": "processed 4 entries (ids 1-4, FIFO); Safe minted 4,160,871.205527 PT+YT",
+   "gasUsed": 570425,
+   "t_plus_s": 14,
+   "label": "SIMULATED",
+   "shares": 4160871205526882263707324
+  },
+  {
+   "step": "4K.r",
+   "actor": "Safe",
+   "action": "registerOnWithdrawQueue(piece, MINT_SENTINEL) x10",
+   "result": "10 exits queued; escrowed 4,160,871.205527 shares; pieces 416,087.120553 x9 + 416,087.120553",
+   "gasUsed": 1248478,
+   "t_plus_s": 34,
+   "label": "SIMULATED",
+   "per_call": [
+    171021,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119585
+   ]
+  },
+  {
+   "step": "4K.d",
+   "actor": "stranger (permissionless)",
+   "action": "relay.processWithdrawals(1) x10",
+   "result": "settled 10 exits one per call",
+   "gasUsed": 8259110,
+   "t_plus_s": 54,
+   "label": "SIMULATED",
+   "per_call": [
+    826034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    808804
+   ]
+  },
+  {
+   "step": "5K.sum",
+   "actor": "-",
+   "action": "sum of 10 new sAERO vs deposit",
+   "result": "sum 4,160,871.205527 vs net deposit 4,160,871.205527: shortfall 0 wei (VPM deposit fee 0 wei, VPM withdraw fee 0 wei)",
+   "gasUsed": null,
+   "t_plus_s": 54,
+   "label": "SIMULATED (state read)"
+  },
+  {
+   "step": "5K.perm",
+   "actor": "-",
+   "action": "each new sAERO permanent / owner / free",
+   "result": "permanent(end=0)=True owner=Safe:True free-on-chain0:True ids=[21265, 21266, 21267, 21268, 21269, 21270, 21271, 21272, 21273, 21274]",
+   "gasUsed": null,
+   "t_plus_s": 54,
+   "label": "SIMULATED (state read)"
+  },
+  {
+   "step": "5K.q",
+   "actor": "-",
+   "action": "queue drained",
+   "result": "withdrawQueue=['0', '10', '0'] pendingShares=0 escrow=0 PT=0 YT=0",
+   "gasUsed": null,
+   "t_plus_s": 54,
+   "label": "SIMULATED (state read)"
+  }
+ ],
+ "results": {
+  "overdue": {
+   "shares": 4160871205526882263707324,
+   "pieces": [
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370736
+   ],
+   "new_sAERO": [
+    {
+     "tokenId": 21265,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21266,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21267,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21268,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21269,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21270,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21271,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21272,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21273,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21274,
+     "sharesBurnt": 416087120552688226370736,
+     "net": 416087120552688226370736,
+     "staked": 416087120552688226370736,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370736
+    }
+   ],
+   "sum_new": 4160871205526882263707324,
+   "deposit_gross": 4160871205526882263707324,
+   "deposit_net": 4160871205526882263707324,
+   "vpm_deposit_fee": 0,
+   "vpm_withdraw_fee": 0,
+   "gross_out_of_relay": 4160871205526882263707324,
+   "shortfall_vs_net_deposit": 0,
+   "all_permanent": true,
+   "all_owned_by_safe": true,
+   "all_free_on_chain0": true,
+   "fresh_ids": [
+    21265,
+    21266,
+    21267,
+    21268,
+    21269,
+    21270,
+    21271,
+    21272,
+    21273,
+    21274
+   ],
+   "withdrawQueue(head,tail,count)": [
+    "0",
+    "10",
+    "0"
+   ],
+   "pendingWithdrawalShares": 0,
+   "escrowedShares_safe": 0,
+   "pt_safe": 0,
+   "yt_safe": 0,
+   "relay_totalBacking": 1000000000000000000,
+   "relay_staked": 4000000000000000000,
+   "source_17968_after": {
+    "amount": 0,
+    "end": 0,
+    "isPermanent": true
+   },
+   "register_gas": [
+    171021,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119585
+   ],
+   "drain_gas": [
+    4839111
+   ]
+  },
+  "keeper": {
+   "shares": 4160871205526882263707324,
+   "pieces": [
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370732,
+    416087120552688226370736
+   ],
+   "new_sAERO": [
+    {
+     "tokenId": 21265,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21266,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21267,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21268,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21269,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21270,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21271,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21272,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21273,
+     "sharesBurnt": 416087120552688226370732,
+     "net": 416087120552688226370732,
+     "staked": 416087120552688226370732,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370732
+    },
+    {
+     "tokenId": 21274,
+     "sharesBurnt": 416087120552688226370736,
+     "net": 416087120552688226370736,
+     "staked": 416087120552688226370736,
+     "isPermanent": true,
+     "end": 0,
+     "owner": "0xa79cd47655156b299762DFE92A67980805ce5a31",
+     "chain0": 416087120552688226370736
+    }
+   ],
+   "sum_new": 4160871205526882263707324,
+   "deposit_gross": 4160871205526882263707324,
+   "deposit_net": 4160871205526882263707324,
+   "vpm_deposit_fee": 0,
+   "vpm_withdraw_fee": 0,
+   "gross_out_of_relay": 4160871205526882263707324,
+   "shortfall_vs_net_deposit": 0,
+   "all_permanent": true,
+   "all_owned_by_safe": true,
+   "all_free_on_chain0": true,
+   "fresh_ids": [
+    21265,
+    21266,
+    21267,
+    21268,
+    21269,
+    21270,
+    21271,
+    21272,
+    21273,
+    21274
+   ],
+   "withdrawQueue(head,tail,count)": [
+    "0",
+    "10",
+    "0"
+   ],
+   "pendingWithdrawalShares": 0,
+   "escrowedShares_safe": 0,
+   "pt_safe": 0,
+   "yt_safe": 0,
+   "relay_totalBacking": 4000000000000000000,
+   "relay_staked": 4000000000000000000,
+   "source_17968_after": {
+    "amount": 0,
+    "end": 0,
+    "isPermanent": true
+   },
+   "register_gas": [
+    171021,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119734,
+    119585
+   ],
+   "drain_gas": [
+    826034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    828034,
+    808804
+   ]
+  }
+ },
+ "errors_decoded_from": "metadex-public V3/src"
+}
