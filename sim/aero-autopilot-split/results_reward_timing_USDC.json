@@ -1,0 +1,34 @@
+{
+ "part": "USDC",
+ "fork_block": 53469856,
+ "round_txs": [
+  "0x6f70eceb37c5e2404482c93f3c635b6153464e535784ba21c5b4593f76e541b2",
+  "0x8459276fa7d3949b983a4be811feda853981f4821101233aa562bc900d9fcc57",
+  "0x72ad6a2dd2c20c9cd22de07b2398070e812837af0e70e3791ee098ccbd167c15",
+  "0xa88910881bc2af264b887685e9021d480fd605fc0a56c90eb70e62157fac7622",
+  "0xaf6e002d3ef9bd946d0ebabc1986a15e8f51e31e51e9cacf57d9c1020dfce476",
+  "0xfedd74ea47f0963f24ffad28b9aa528c394745fde02ccb175112b3be59df03f0",
+  "0x3bc8ea10ba771eff04fa69fc706132f056eb730d9126ebef10bf0ae074a9b133",
+  "0x0e27cb4705dc80ae9db44ff2cc3f6f84ecc21e3cb728c7d3cd50d556322cb7a8",
+  "0x4a8069cdd5567745e345ff39c451aebc961ba94e6fee106211929e9f90811e19"
+ ],
+ "USDC": {
+  "join_before": {
+   "safe_yt": 4160871205526882263707324,
+   "yt_supply_at_round": 32869910793908527844524387,
+   "distributed": 11486790048,
+   "safe_claimable_gain": 1454067041,
+   "pro_rata": 1454067041
+  },
+  "exit_before": {
+   "holder": "0x31bce2423640d7e536d0123943175482c11d983b",
+   "deposit_id": 441,
+   "holder_yt": 266731146583249253287053,
+   "claimable_gain": 0
+  },
+  "queued": {
+   "claimable_gain": 148949101,
+   "pro_rata": 148949101
+  }
+ }
+}
